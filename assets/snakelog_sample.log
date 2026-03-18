@@ -1,0 +1,11 @@
+[Thu Mar  5 11:45:18 2026]
+rule preprocess_merge:
+    input: /data/analysis/260302_M08590_97/fastq/sample_name_S1_R1_001.fastq.gz, /data/analysis/260302_M08590_97/fastq/sample_name_S1_R2_001.fastq.gz
+    output: /data/analysis/260302_M08590_97/preprocess-flash/sample_name_S1.fastq.gz
+    jobid: 3
+    reason: Missing output files: /data/analysis/260302_M08590_97/preprocess-flash/sample_name_S1.fastq.gz
+    wildcards: outdir=/data/analysis/260302_M08590_97, sample=sample_name_S1
+    threads: 24
+    resources: mem_mb=2107, mem_mib=2010, disk_mb=2107, disk_mib=2010, tmpdir=<TBD>, slurm_partition=GENOMIQUE-CPU, slurm_account=routine, tasks_per_gpu=0
+No wall time information given. This might or might not work on your cluster. If not, specify the resource runtime in your rule or as a reasonable default via --default-resources.
+Job 3 has been submitted with SLURM jobid 60392 (log: /data/analysis/260302_M08590_97/.snakemake/slurm_logs/rule_preprocess_merge/_data_analysis_260302_M08590_97_sample_name_S1/60392.log).
