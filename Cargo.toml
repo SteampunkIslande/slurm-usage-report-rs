@@ -10,6 +10,8 @@ duckdb = { version = "1.10500.0", features = [
     "polars",
     "serde_json",
 ] }
+include_dir = "0.7.4"
+minijinja = "2.18.0"
 plotlars = "0.11.7"
 plotly = "0.14.1"
 polars = { version = "0.53.0", features = ["lazy"] }

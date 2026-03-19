@@ -1,0 +1,117 @@
+{% from "macros/charts.html.j2" import render_calendar, render_line_plot, render_chart_selector,
+render_chart_filter_script, render_chart_selector_styles %}
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport agrégé du cluster - {{ from_date }} à {{ to_date }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #333;
+        }
+
+        .summary {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .calendar-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .calendar-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fafafa;
+            border-radius: 5px;
+        }
+
+        .legend-gradient {
+            width: 200px;
+            height: 20px;
+            background: linear-gradient(to right, #440154, #482878, #3e4a89, #31688e, #26838f, #1f9e89, #35b779, #6ece58, #b5de2b, #fde725);
+            border-radius: 3px;
+            margin: 0 10px;
+        }
+
+        .legend-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+    {{ render_chart_selector_styles() }}
+</head>
+
+<body>
+    <h1>Rapport agrégé d'efficacité du cluster</h1>
+    <h2>Période: {{ from_date }} à {{ to_date }}</h2>
+
+    <div class="summary">
+        <p><strong>Nombre de jours avec données:</strong> {{ num_days }}</p>
+    </div>
+
+    {# Définir les types de graphiques et métriques disponibles #}
+    {% set chart_types = [
+    {"id": "calendar", "label": "Calendrier"},
+    {"id": "line", "label": "Courbe"}
+    ] %}
+
+    {# Extraire les métriques uniques depuis les calendriers #}
+    {% set metrics = [] %}
+    {% for metric in calendars %}
+    {% set _ = metrics.append({"id": metric.title, "label": metric.title}) %}
+    {% endfor %}
+
+    {# Afficher le sélecteur de graphiques #}
+    {{ render_chart_selector(chart_types, metrics) }}
+
+    {# Afficher tous les calendriers #}
+    {% for metric in calendars %}
+    {{ render_calendar(metric) }}
+    {% endfor %}
+
+    {# Afficher tous les line plots #}
+    {% for plot in line_plots %}
+    {{ render_line_plot(plot) }}
+    {% endfor %}
+
+    <footer>
+        <p><em>Rapport généré automatiquement le {{ generation_time }}</em></p>
+    </footer>
+
+    {{ render_chart_filter_script() }}
+</body>
+
+</html>
