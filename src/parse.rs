@@ -11,16 +11,18 @@ use std::sync::LazyLock;
 
 // ── Regex compilées une seule fois ──────────────────────────────────────────
 
-static RULE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^rule\s+(\S+):").unwrap());
+static RULE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^rule\s+(\S+):").expect("This should not have compiled"));
 
-static INPUT_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)^\s*input\s*:\s*(.+)").unwrap());
+static INPUT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\s*input\s*:\s*(.+)").expect("This should not have compiled")
+});
 
 static SLURM_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)Job\s+(\d+)\s+has\s+been\s+submitted\s+with\s+SLURM\s+jobid\s+(\d+)\s+\(log:\s*(.+)\)\.$",
     )
-    .unwrap()
+    .expect("This should not have compiled")
 });
 
 // ── Structures ──────────────────────────────────────────────────────────────
@@ -223,7 +225,7 @@ mod tests {
         let result = find_project_dir(path);
         // Le dossier n'existe pas réellement, donc canonicalize échouera et on aura le chemin brut
         assert!(result.is_some());
-        let dir = result.unwrap();
+        let dir = result.expect("Error while running test_find_project_dir_valid");
         assert!(&dir == "/tmp/myproject");
     }
 
