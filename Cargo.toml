@@ -10,6 +10,8 @@ duckdb = { version = "1.10500.0", features = [
     "polars",
     "serde_json",
 ] }
+plotlars = "0.11.7"
+plotly = "0.14.1"
 polars = { version = "0.53.0", features = ["lazy"] }
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
