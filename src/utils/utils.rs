@@ -356,16 +356,13 @@ pub fn add_job_duration_cols(lf: LazyFrame) -> LazyFrame {
 pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
     let date_str = date.as_ref();
 
-    // Parse the target date
-    let target_date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+    // Parse the target date (kept for potential future use)
+    let _target_date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
         .expect("Invalid date format, expected YYYY-MM-DD");
 
     // Create day boundaries
     let day_start = format!("{}T00:00:00", date_str);
     let day_end = format!("{}T23:59:59", date_str);
-    dbg!(&date_str);
-    dbg!(&day_start);
-    dbg!(&day_end);
 
     // Convert Start and End to datetime
     let datetime_format = "%Y-%m-%dT%H:%M:%S";
@@ -412,37 +409,40 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
         .alias("day_end");
 
     // Build the conditional expression for daily duration
+    // Convert target_date to a string for consistent comparison
+    let target_date_str = date_str;
+    let target_date_col = lit(target_date_str).str().to_date(StrptimeOptions {
+        format: Some("%Y-%m-%d".into()),
+        ..Default::default()
+    });
+
     // Case 1: Job started and ended on the same day (target day)
     let same_day = start_dt
         .clone()
         .dt()
         .date()
-        .eq(lit(target_date))
-        .and(end_dt.clone().dt().date().eq(lit(target_date)));
-    let duration_same_day = (end_dt.clone() - start_dt.clone())
-        .dt()
-        .total_seconds(false)
-        / lit(3600);
+        .eq(target_date_col.clone())
+        .and(end_dt.clone().dt().date().eq(target_date_col.clone()));
+    // Note: subtracting two datetimes gives a Duration in microseconds.
+    // Convert microseconds to hours: divide by 3600000000 (microseconds in an hour)
+    let duration_same_day =
+        (end_dt.clone() - start_dt.clone()).cast(DataType::Float64) / lit(3600000000.0);
 
     // Case 2: Job started before target day, ended on target day
     let started_before = start_dt.clone().lt(day_start_lit.clone());
-    let ended_on_day = end_dt.clone().dt().date().eq(lit(target_date));
+    let ended_on_day = end_dt.clone().dt().date().eq(target_date_col.clone());
     let case_started_before = started_before.clone().and(ended_on_day);
-    let duration_started_before = (end_dt.clone() - day_start_lit.clone())
-        .dt()
-        .total_seconds(false)
-        / lit(3600);
+    // Duration - convert microseconds to hours
+    let duration_started_before =
+        (end_dt.clone() - day_start_lit.clone()).cast(DataType::Float64) / lit(3600000000.0);
 
     // Case 3: Job started on target day, ended after
-    let started_on_day = start_dt
-        .clone()
-        .dt()
-        .date()
-        .eq(lit(target_date).alias("target_date"));
+    let started_on_day = start_dt.clone().dt().date().eq(target_date_col.clone());
     let ended_after = end_dt.gt_eq(day_end_lit.clone());
     let case_ended_after = started_on_day.and(ended_after.clone());
+    // Duration - convert microseconds to hours
     let duration_ended_after =
-        (day_end_lit - start_dt.clone()).dt().total_seconds(false) / lit(3600);
+        (day_end_lit - start_dt.clone()).cast(DataType::Float64) / lit(3600000000.0);
 
     // Case 4: Job spanned multiple days (started before and ended after)
     let spanning = started_before.and(ended_after.clone());
@@ -616,11 +616,18 @@ mod tests {
         let lf = create_test_lazyframe(&[("1", "2026-02-24T10:00:00", "2026-02-24T10:30:00")]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
+        // Print all columns including debug
+        eprintln!("Columns: {:?}", result.get_column_names());
+        eprintln!("Result:\n{}", result);
+
         let daily_duration = result
             .column("daily_duration_hours")
             .unwrap()
             .get(0)
             .unwrap();
-        assert!((daily_duration.try_extract::<f64>().unwrap() - 0.5).abs() < 0.001);
+        let duration_value = daily_duration.try_extract::<f64>().unwrap();
+        eprintln!("test_half_hour_job: got {} hours", duration_value);
+
+        assert!((duration_value - 0.5).abs() < 0.001);
     }
 }
