@@ -2,7 +2,8 @@
 //!
 //! This module provides functions for processing SLURM job data using Polars.
 
-use chrono::NaiveDate;
+use std::ops::Div;
+
 use polars::prelude::*;
 
 /// All available columns from sacct output
@@ -264,14 +265,7 @@ pub fn add_wait_time_cols(mut lf: LazyFrame) -> LazyFrame {
         ..Default::default()
     };
 
-    lf = lf.with_columns([col("Start").str().to_datetime(
-        None,
-        None,
-        datetime_conversion_options.clone(),
-        lit("raise"),
-    )]);
-
-    lf.with_columns([(col("Start").str().to_datetime(
+    lf = lf.with_columns([(col("Start").str().to_datetime(
         None,
         None,
         datetime_conversion_options.clone(),
@@ -282,18 +276,17 @@ pub fn add_wait_time_cols(mut lf: LazyFrame) -> LazyFrame {
         datetime_conversion_options.clone(),
         lit("raise"),
     ))
-    .alias("wait_dt")])
-        .with_columns([
-            col("wait_dt")
-                .dt()
-                .total_seconds(true)
-                .alias("wait_time_seconds"),
-            col("wait_dt")
-                .dt()
-                .total_hours(true)
-                .alias("wait_time_hours"),
-        ])
-        .drop(by_name(["wait_dt"], false, false))
+    .alias("wait_duration")]);
+
+    lf = lf
+        .with_columns([(col("wait_duration")
+            .dt()
+            .total_seconds(false)
+            .alias("wait_time_seconds"))])
+        .with_columns([col("wait_time_seconds")
+            .div(lit(3600.0))
+            .alias("wait_time_hours")]);
+    lf
 }
 
 /// Adds job duration columns to a LazyFrame.
@@ -355,10 +348,6 @@ pub fn add_job_duration_cols(lf: LazyFrame) -> LazyFrame {
 /// - Job did not run on target day: 0 hours
 pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
     let date_str = date.as_ref();
-
-    // Parse the target date (kept for potential future use)
-    let _target_date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-        .expect("Invalid date format, expected YYYY-MM-DD");
 
     // Create day boundaries
     let day_start = format!("{}T00:00:00", date_str);
@@ -653,19 +642,29 @@ mod tests {
         ]);
         let result = add_wait_time_cols(lf).collect().unwrap();
 
-        let expected = [4.0, 2.0, 4.0, 24.0, 0.0];
-        for (i, &exp) in expected.iter().enumerate() {
-            let daily_duration = result
-                .column("daily_duration_hours")
-                .unwrap()
-                .get(i)
-                .unwrap();
+        let expected_hours = [2.0, 1.0, 1.5, 0.25, 0.333333];
+        let expected_seconds = [7200, 3600, 5400, 900, 1200];
+        for (i, (&exp_hours, &exp_secs)) in expected_hours
+            .iter()
+            .zip(expected_seconds.iter())
+            .enumerate()
+        {
+            let wait_time_hours = result.column("wait_time_hours").unwrap().get(i).unwrap();
             assert!(
-                (daily_duration.try_extract::<f64>().unwrap() - exp).abs() < 0.001,
-                "Job {} failed: expected {}, got {}",
+                (wait_time_hours.try_extract::<f64>().unwrap() - exp_hours).abs() < 0.001,
+                "Wait time for job {} is incorrect: expected {} hours, got {} hours",
                 i + 1,
-                exp,
-                daily_duration.try_extract::<f64>().unwrap()
+                exp_hours,
+                wait_time_hours.try_extract::<f64>().unwrap()
+            );
+
+            let wait_time_seconds = result.column("wait_time_seconds").unwrap().get(i).unwrap();
+            assert!(
+                wait_time_seconds.try_extract::<i32>().unwrap() == exp_secs,
+                "Wait time for job {} is incorrect: expected {} seconds, got {} seconds",
+                i + 1,
+                exp_secs,
+                wait_time_seconds.try_extract::<i32>().unwrap()
             );
         }
     }
