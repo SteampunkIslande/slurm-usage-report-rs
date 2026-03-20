@@ -269,19 +269,19 @@ pub fn add_wait_time_cols(mut lf: LazyFrame) -> LazyFrame {
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     )]);
 
     lf.with_columns([(col("Start").str().to_datetime(
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     ) - col("Submit").str().to_datetime(
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     ))
     .alias("wait_dt")])
         .with_columns([
@@ -321,12 +321,12 @@ pub fn add_job_duration_cols(lf: LazyFrame) -> LazyFrame {
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     ) - col("Start").str().to_datetime(
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     ))
     .alias("duration_dt")])
         .with_columns([col("duration_dt")
@@ -361,13 +361,20 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
     // Parse the target date
     let target_date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
         .expect("Invalid date format, expected YYYY-MM-DD");
+    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
-    // Create day boundaries
-    let day_start = format!("{} 00:00:00", date_str);
-    let day_end = {
-        let next_day = target_date + chrono::TimeDelta::days(1);
-        format!("{} 00:00:00", next_day.format("%Y-%m-%d"))
-    };
+    // Create day boundaries as chrono NaiveDateTime
+    let day_start_ndt = target_date.and_hms_opt(0, 0, 0).expect("Invalid day start");
+    let next_day = target_date + chrono::TimeDelta::days(1);
+    let day_end_ndt = next_day.and_hms_opt(0, 0, 0).expect("Invalid day end");
+
+    // Convert to microseconds since epoch for Polars datetime literals
+    let day_start_us = day_start_ndt.and_utc().timestamp_micros();
+    let day_end_us = day_end_ndt.and_utc().timestamp_micros();
+
+    // Target date as days since epoch for Date literal
+    let target_days = (target_date - epoch).num_days() as i32;
+    let target_date_lit = lit(target_days).cast(DataType::Date);
 
     // Convert Start and End to datetime
     let datetime_format = "%Y-%m-%dT%H:%M:%S";
@@ -382,35 +389,21 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     );
     let end_dt = col("End").str().to_datetime(
         Default::default(),
         Default::default(),
         datetime_conversion_options.clone(),
-        Default::default(),
+        lit("raise"),
     );
 
-    // Create literals for day boundaries
-    let day_start_lit = lit(day_start.clone())
-        .alias("day_start_lit")
-        .str()
-        .to_datetime(
-            Default::default(),
-            Default::default(),
-            datetime_conversion_options.clone(),
-            Default::default(),
-        )
+    // Create datetime literals for day boundaries using timestamp microseconds
+    let day_start_lit = lit(day_start_us)
+        .cast(DataType::Datetime(TimeUnit::Microseconds, None))
         .alias("day_start");
-    let day_end_lit = lit(day_end.clone())
-        .alias("day_end_lit")
-        .str()
-        .to_datetime(
-            Default::default(),
-            Default::default(),
-            datetime_conversion_options.clone(),
-            Default::default(),
-        )
+    let day_end_lit = lit(day_end_us)
+        .cast(DataType::Datetime(TimeUnit::Microseconds, None))
         .alias("day_end");
 
     // Build the conditional expression for daily duration
@@ -419,14 +412,14 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
         .clone()
         .dt()
         .date()
-        .eq(lit(target_date))
-        .and(end_dt.clone().dt().date().eq(lit(target_date)));
+        .eq(target_date_lit.clone())
+        .and(end_dt.clone().dt().date().eq(target_date_lit.clone()));
     let duration_same_day =
         (end_dt.clone() - start_dt.clone()).dt().total_seconds(true) / lit(3600.0);
 
     // Case 2: Job started before target day, ended on target day
     let started_before = start_dt.clone().lt(day_start_lit.clone());
-    let ended_on_day = end_dt.clone().dt().date().eq(lit(target_date));
+    let ended_on_day = end_dt.clone().dt().date().eq(target_date_lit.clone());
     let case_started_before = started_before.clone().and(ended_on_day);
     let duration_started_before = (end_dt.clone() - day_start_lit.clone())
         .dt()
@@ -434,11 +427,7 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
         / lit(3600.0);
 
     // Case 3: Job started on target day, ended after
-    let started_on_day = start_dt
-        .clone()
-        .dt()
-        .date()
-        .eq(lit(target_date).alias("target_date"));
+    let started_on_day = start_dt.clone().dt().date().eq(target_date_lit.clone());
     let ended_after = end_dt.gt_eq(day_end_lit.clone());
     let case_ended_after = started_on_day.and(ended_after.clone());
     let duration_ended_after =
@@ -460,14 +449,8 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
         .otherwise(lit(0.0))
         .alias("daily_duration_hours");
 
-    // Add date column
-    let date_col = lit(date_str.to_string())
-        .str()
-        .to_date(StrptimeOptions {
-            format: Some("%Y-%m-%d".into()),
-            ..Default::default()
-        })
-        .alias("date");
+    // Add date column using days since epoch
+    let date_col = target_date_lit.alias("date");
 
     lf.with_columns([daily_duration, date_col])
 }
