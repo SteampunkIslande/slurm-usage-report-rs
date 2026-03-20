@@ -17,9 +17,13 @@ pub struct PostRunCmd {
     #[arg(short, long, num_args = 1..)]
     input: Vec<PathBuf>,
 
+    /// Chemin vers le rapport html d'utilisation du cluster pour le(s) exécutions de snakemake.
+    #[arg(long)]
+    output_html: PathBuf,
+
     /// Chemin vers le fichier parquet de rapport d'utilisation
-    #[arg(short, long)]
-    output: String,
+    #[arg(long)]
+    output_parquet: Option<PathBuf>,
 
     /// Chemin vers la base de données SACCT maison du cluster (dossier avec les fichiers parquet).
     ///
