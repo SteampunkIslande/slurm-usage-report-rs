@@ -258,4 +258,103 @@ mod tests {
         assert_eq!(parsed.slurm_id, "12345");
         assert_eq!(parsed.inputs, vec!["file1.txt", "file2.txt"]);
     }
+
+    #[test]
+    fn test_parse_snakemake_log_file_integration() -> io::Result<()> {
+        use tempfile::tempdir;
+
+        // Créer un répertoire temporaire pour simuler la structure du projet
+        let temp_dir = tempdir()?;
+
+        // Créer la structure .snakemake/log/
+        let snakemake_dir = temp_dir.path().join(".snakemake");
+        let log_dir = snakemake_dir.join("log");
+        std::fs::create_dir_all(&log_dir)?;
+
+        // Créer des fichiers d'entrée temporaires avec du contenu
+        let input_dir = temp_dir.path().join("inputs");
+        std::fs::create_dir_all(&input_dir)?;
+        let input_file1 = input_dir.join("sample1.txt");
+        let input_file2 = input_dir.join("sample2.txt");
+        std::fs::write(&input_file1, b"test content 1")?;
+        std::fs::write(&input_file2, b"test content 2")?;
+
+        // Créer le fichier de log Snakemake
+        let log_content = format!(
+            r#"[Thu Mar  5 11:45:18 2026]
+rule preprocess_merge:
+    input: {}, {}
+    output: /data/analysis/output.txt
+    shell:
+        echo "Hello"
+    jobid: 3
+No wall time information given. This might or might not work on your cluster. If not, specify the resource runtime in your rule or as a reasonable default via --default-resources.
+Job 3 has been submitted with SLURM jobid 60392 (log: {})."#,
+            input_file1.display(),
+            input_file2.display(),
+            log_dir.join("run.log").display()
+        );
+
+        let log_path = log_dir.join("run.log");
+        std::fs::write(&log_path, log_content)?;
+
+        // Créer un fichier temporaire pour la sortie
+        let output_file = temp_dir.path().join("output.csv");
+
+        // Appeler la fonction publique à tester
+        parse_snakemake_log_file(&log_path, &output_file)?;
+
+        // Vérifier que le fichier de sortie existe et contient les données attendues
+        let output_content = std::fs::read_to_string(&output_file)?;
+
+        eprintln!("{}", output_content);
+
+        // La sortie doit contenir:
+        // - slurm_jobid: 60392
+        // - job_id: 3
+        // - rule_name: preprocess_merge
+        // - input_size_bytes: la taille des deux fichiers (14 + 14 = 28 bytes)
+        // - inputs: les chemins canoniques des fichiers
+
+        assert!(
+            !output_content.is_empty(),
+            "Le fichier de sortie ne doit pas être vide"
+        );
+
+        let line = output_content
+            .lines()
+            .next()
+            .expect("Devrait contenir au moins une ligne");
+        let parts: Vec<&str> = line.split('|').collect();
+
+        assert_eq!(
+            parts.len(),
+            5,
+            "La ligne doit contenir 5 champs séparés par '|'"
+        );
+        assert_eq!(parts[0], "60392", "Le SLURM job ID doit être 60392");
+        assert_eq!(parts[1], "3", "Le job ID doit être 3");
+        assert_eq!(
+            parts[2], "preprocess_merge",
+            "Le rule name doit être preprocess_merge"
+        );
+        // La taille doit être > 0 car les fichiers existent
+        let input_size: u64 = parts[3].parse().expect("La taille doit être un nombre");
+        assert!(input_size > 0, "La taille des inputs doit être > 0");
+        // Les chemins doivent contenir les noms de fichiers
+        assert!(
+            parts[4].contains("sample1.txt"),
+            "Les inputs doivent contenir sample1.txt"
+        );
+        assert!(
+            parts[4].contains("sample2.txt"),
+            "Les inputs doivent contenir sample2.txt"
+        );
+
+        // Le fichier temporaire de sortie sera automatiquement supprimé
+        // quand `output_file` sortira de portée (via Drop)
+        // et `temp_dir` sera nettoyé automatiquement
+
+        Ok(())
+    }
 }
