@@ -475,11 +475,12 @@ mod tests {
     use super::*;
     use polars::df;
 
-    fn create_test_lazyframe(data: &[(&str, &str, &str)]) -> LazyFrame {
+    fn create_test_lazyframe(data: &[(&str, &str, &str, &str)]) -> LazyFrame {
         let df = df!(
-            "JobID" => data.iter().map(|(id, _, _)| (*id).to_string()).collect::<Vec<String>>(),
-            "Start" => data.iter().map(|(_, start, _)| (*start).to_string()).collect::<Vec<String>>(),
-            "End" => data.iter().map(|(_, _, end)| (*end).to_string()).collect::<Vec<String>>(),
+            "JobID" => data.iter().map(|(id, _, _, _)| (*id).to_string()).collect::<Vec<String>>(),
+            "Start" => data.iter().map(|(_, start, _,_)| (*start).to_string()).collect::<Vec<String>>(),
+            "End" => data.iter().map(|(_, _, end,_)| (*end).to_string()).collect::<Vec<String>>(),
+            "Submit"=>data.iter().map(|(_, _, _,submit)| (*submit).to_string()).collect::<Vec<String>>()
         )
         .unwrap();
         df.lazy()
@@ -487,7 +488,12 @@ mod tests {
 
     #[test]
     fn test_same_day_job() {
-        let lf = create_test_lazyframe(&[("1", "2026-02-24T10:00:00", "2026-02-24T14:00:00")]);
+        let lf = create_test_lazyframe(&[(
+            "1",
+            "2026-02-24T10:00:00",
+            "2026-02-24T14:00:00",
+            "2026-02-24T10:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         let daily_duration = result
@@ -500,7 +506,12 @@ mod tests {
 
     #[test]
     fn test_job_started_previous_day() {
-        let lf = create_test_lazyframe(&[("2", "2026-02-23T22:00:00", "2026-02-24T02:30:00")]);
+        let lf = create_test_lazyframe(&[(
+            "2",
+            "2026-02-23T22:00:00",
+            "2026-02-24T02:30:00",
+            "2026-02-23T22:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         // From midnight (00:00) to 02:30 = 2 hours and a half
@@ -514,7 +525,12 @@ mod tests {
 
     #[test]
     fn test_job_ends_next_day() {
-        let lf = create_test_lazyframe(&[("3", "2026-02-24T20:00:00", "2026-02-25T04:00:00")]);
+        let lf = create_test_lazyframe(&[(
+            "3",
+            "2026-02-24T20:00:00",
+            "2026-02-25T04:00:00",
+            "2026-02-24T20:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         // From 20:00 to midnight (24:00) = 4 hours
@@ -528,7 +544,12 @@ mod tests {
 
     #[test]
     fn test_spanning_job() {
-        let lf = create_test_lazyframe(&[("4", "2026-02-23T12:00:00", "2026-02-25T12:00:00")]);
+        let lf = create_test_lazyframe(&[(
+            "4",
+            "2026-02-23T12:00:00",
+            "2026-02-25T12:00:00",
+            "2026-02-23T12:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         // Full day = 24 hours
@@ -542,7 +563,12 @@ mod tests {
 
     #[test]
     fn test_job_not_on_target_day() {
-        let lf = create_test_lazyframe(&[("5", "2026-02-22T10:00:00", "2026-02-22T14:00:00")]);
+        let lf = create_test_lazyframe(&[(
+            "5",
+            "2026-02-22T10:00:00",
+            "2026-02-22T14:00:00",
+            "2026-02-22T10:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         let daily_duration = result
@@ -555,7 +581,12 @@ mod tests {
 
     #[test]
     fn test_job_runs_future_day() {
-        let lf = create_test_lazyframe(&[("6", "2026-02-25T10:00:00", "2026-02-25T14:00:00")]);
+        let lf = create_test_lazyframe(&[(
+            "6",
+            "2026-02-25T10:00:00",
+            "2026-02-25T14:00:00",
+            "2026-02-25T10:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         let daily_duration = result
@@ -568,7 +599,12 @@ mod tests {
 
     #[test]
     fn test_midnight_to_midnight() {
-        let lf = create_test_lazyframe(&[("8", "2026-02-24T00:00:00", "2026-02-25T00:00:00")]);
+        let lf = create_test_lazyframe(&[(
+            "8",
+            "2026-02-24T00:00:00",
+            "2026-02-25T00:00:00",
+            "2026-02-24T00:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         // This should be 24 hours since end is exclusive (at midnight next day)
@@ -582,13 +618,91 @@ mod tests {
     }
 
     #[test]
+    fn test_job_wait_duration() {
+        let lf = create_test_lazyframe(&[
+            (
+                "1",
+                "2026-02-24T12:00:00",
+                "2026-02-24T14:00:00",
+                "2026-02-24T10:00:00",
+            ), // 2h wait time
+            (
+                "2",
+                "2026-02-23T22:00:00",
+                "2026-02-24T02:00:00",
+                "2026-02-23T21:00:00",
+            ), // 1h wait time
+            (
+                "3",
+                "2026-02-24T20:00:00",
+                "2026-02-25T04:00:00",
+                "2026-02-24T18:30:00",
+            ), // 1h30min wait time
+            (
+                "4",
+                "2026-02-23T12:00:00",
+                "2026-02-25T12:00:00",
+                "2026-02-23T11:45:00",
+            ), // 15min wait time
+            (
+                "5",
+                "2026-02-22T10:00:00",
+                "2026-02-22T14:00:00",
+                "2026-02-22T09:40:00",
+            ), // 20min wait time
+        ]);
+        let result = add_wait_time_cols(lf).collect().unwrap();
+
+        let expected = [4.0, 2.0, 4.0, 24.0, 0.0];
+        for (i, &exp) in expected.iter().enumerate() {
+            let daily_duration = result
+                .column("daily_duration_hours")
+                .unwrap()
+                .get(i)
+                .unwrap();
+            assert!(
+                (daily_duration.try_extract::<f64>().unwrap() - exp).abs() < 0.001,
+                "Job {} failed: expected {}, got {}",
+                i + 1,
+                exp,
+                daily_duration.try_extract::<f64>().unwrap()
+            );
+        }
+    }
+
+    #[test]
     fn test_multiple_jobs() {
         let lf = create_test_lazyframe(&[
-            ("1", "2026-02-24T10:00:00", "2026-02-24T14:00:00"), // 4h
-            ("2", "2026-02-23T22:00:00", "2026-02-24T02:00:00"), // 2h
-            ("3", "2026-02-24T20:00:00", "2026-02-25T04:00:00"), // 4h
-            ("4", "2026-02-23T12:00:00", "2026-02-25T12:00:00"), // 24h
-            ("5", "2026-02-22T10:00:00", "2026-02-22T14:00:00"), // 0h
+            (
+                "1",
+                "2026-02-24T10:00:00",
+                "2026-02-24T14:00:00",
+                "2026-02-24T10:00:00",
+            ), // 4h
+            (
+                "2",
+                "2026-02-23T22:00:00",
+                "2026-02-24T02:00:00",
+                "2026-02-23T22:00:00",
+            ), // 2h
+            (
+                "3",
+                "2026-02-24T20:00:00",
+                "2026-02-25T04:00:00",
+                "2026-02-24T20:00:00",
+            ), // 4h
+            (
+                "4",
+                "2026-02-23T12:00:00",
+                "2026-02-25T12:00:00",
+                "2026-02-23T12:00:00",
+            ), // 24h
+            (
+                "5",
+                "2026-02-22T10:00:00",
+                "2026-02-22T14:00:00",
+                "2026-02-22T10:00:00",
+            ), // 0h
         ]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
@@ -611,7 +725,12 @@ mod tests {
 
     #[test]
     fn test_half_hour_job() {
-        let lf = create_test_lazyframe(&[("1", "2026-02-24T10:00:00", "2026-02-24T10:30:00")]);
+        let lf = create_test_lazyframe(&[(
+            "1",
+            "2026-02-24T10:00:00",
+            "2026-02-24T10:30:00",
+            "2026-02-24T10:00:00",
+        )]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
         // Print all columns including debug
