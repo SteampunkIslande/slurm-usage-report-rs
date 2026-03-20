@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     PostRunCmd(PostRunCmd),
+    Generate,
 }
 
 #[derive(Debug, Parser)]
