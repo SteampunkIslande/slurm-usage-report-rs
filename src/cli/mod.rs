@@ -1,3 +1,6 @@
+pub mod auto_complete;
+use auto_complete::AutoComplete;
+
 pub mod post_run;
 pub use post_run::PostRunCmd;
 
@@ -6,7 +9,7 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     PostRunCmd(PostRunCmd),
-    Generate,
+    Generate(AutoComplete),
 }
 
 #[derive(Debug, Parser)]

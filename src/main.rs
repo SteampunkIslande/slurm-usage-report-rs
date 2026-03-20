@@ -1,12 +1,8 @@
 pub mod cli;
 use clap::{CommandFactory, Parser};
-use clap_complete::{
-    generate,
-    shells::{Bash, Zsh},
-};
+use clap_complete::generate;
 use cli::*;
-use std::env;
-use std::io;
+use std::fs::OpenOptions;
 
 fn main() {
     let cli = Cli::parse();
@@ -14,26 +10,25 @@ fn main() {
         Commands::PostRunCmd(post_run_command) => {
             post_run_command.run();
         }
-        Commands::Generate => {
+        Commands::Generate(auto_complete) => {
             let mut command = cli::Cli::command();
-            if env::var("SHELL")
-                .unwrap_or("/bin/bash".into())
-                .to_lowercase()
-                .contains("zsh")
+            match OpenOptions::new()
+                .create(true)
+                .create_new(!auto_complete.force)
+                .write(true)
+                .open(&auto_complete.output)
             {
-                generate(
-                    Zsh,
-                    &mut command,
-                    "slurm-usage-report-rs",
-                    &mut io::stdout(),
-                );
-            } else {
-                generate(
-                    Bash,
-                    &mut command,
-                    "slurm-usage-report-rs",
-                    &mut io::stdout(),
-                );
+                Ok(mut complete_file) => {
+                    generate(
+                        auto_complete.shell,
+                        &mut command,
+                        "slurm-usage-report-rs",
+                        &mut complete_file,
+                    );
+                }
+                Err(e) => {
+                    eprintln!("Impossible de générer le script d'autocomplétion: {e}")
+                }
             }
         }
     }
