@@ -10,7 +10,7 @@ fn main() {
         Commands::PostRunCmd(post_run_command) => {
             post_run_command.run();
         }
-        Commands::Generate(auto_complete) => {
+        Commands::Autocomplete(auto_complete) => {
             let mut command = cli::Cli::command();
             match OpenOptions::new()
                 .create(true)
