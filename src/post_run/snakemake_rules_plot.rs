@@ -51,10 +51,10 @@ pub fn plot_snakemake_rules_with_selector(
         .collect();
 
     // Générer les options de la combobox
-    let mut options_html = String::from("<option value=\"ALL\">ALL</option>");
+    let mut options_html = String::from(r#"<option value="ALL">ALL</option>"#);
     for rule_name in &rule_names {
         options_html.push_str(&format!(
-            "<option value=\"{}\">{}</option>",
+            r#"<option value="{}">{}</option>"#,
             rule_name, rule_name
         ));
     }
@@ -88,25 +88,24 @@ pub fn plot_snakemake_rules_with_selector(
 
     // Construire le HTML final avec la combobox et le JavaScript
     let html = format!(
-        r#"<div id="{}">
-  <select id="{}_selector" onchange="{}_updatePlot(this.value)">
-    {}
+        r#"<div id="{div_name}">
+  <select id="{div_name}_selector" onchange="{div_name}_updatePlot(this.value)">
+    {options_html}
   </select>
-  {}
+  {plots_html}
   <script>
-    function {}_updatePlot(value) {{
+    function {div_name}_updatePlot(value) {{
       var plots = document.getElementsByClassName('rule-plot');
       for (var i = 0; i < plots.length; i++) {{
         plots[i].style.display = 'none';
       }}
-      var selectedPlot = document.getElementById('{}_plot_' + value);
+      var selectedPlot = document.getElementById('{div_name}_plot_' + value);
       if (selectedPlot) {{
         selectedPlot.style.display = 'block';
       }}
     }}
   </script>
 </div>"#,
-        div_name, div_name, div_name, options_html, plots_html, div_name, div_name
     );
 
     html
