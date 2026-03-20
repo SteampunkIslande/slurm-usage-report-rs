@@ -2,10 +2,13 @@
 //!
 //! Sortie : CSV (délimiteur `|`) avec colonnes `slurm_jobid|job_id|rule_name|input_size_bytes|inputs`
 
+use csv::{Writer, WriterBuilder};
 use regex::Regex;
+use serde::Serialize;
+use serde::ser::SerializeStruct;
 use std::env;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -30,10 +33,46 @@ static SLURM_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Résultat de l'extraction d'un enregistrement de log Snakemake.
 #[derive(Debug, Default)]
 struct ParsedRecord {
-    inputs: Vec<String>,
-    slurm_id: String,
-    rule_name: String,
+    slurm_jobid: String,
     job_id: String,
+    rule_name: String,
+    inputs: Vec<String>,
+}
+
+impl Serialize for ParsedRecord {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("ParsedRecord", 5)?;
+        s.serialize_field("slurm_jobid", &self.slurm_jobid)?;
+        s.serialize_field("job_id", &self.job_id)?;
+        s.serialize_field("rule_name", &self.rule_name)?;
+        let solved_inputs: Vec<PathBuf> = self
+            .inputs
+            .iter()
+            .map(|p| {
+                let pb = PathBuf::from(p);
+                fs::canonicalize(&pb).unwrap_or_else(|_| pb.to_path_buf())
+            })
+            .collect();
+
+        let input_size_bytes: u64 = solved_inputs
+            .iter()
+            .filter_map(|p| fs::metadata(p).ok())
+            .map(|m| m.len())
+            .sum();
+        s.serialize_field("input_size_bytes", &input_size_bytes)?;
+        s.serialize_field(
+            "inputs",
+            &solved_inputs
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        )?;
+        s.end()
+    }
 }
 
 // ── Fonctions internes ──────────────────────────────────────────────────────
@@ -137,7 +176,7 @@ fn extract_from_record(record_lines: &[String]) -> ParsedRecord {
         }
         if let Some(caps) = SLURM_RE.captures(line) {
             parsed.job_id = caps[1].to_string();
-            parsed.slurm_id = caps[2].to_string();
+            parsed.slurm_jobid = caps[2].to_string();
         }
         if let Some(caps) = RULE_RE.captures(line) {
             parsed.rule_name = caps[1].to_string();
@@ -166,10 +205,15 @@ pub fn parse_snakemake_log_file(log_path: &Path, output_path: &Path) -> io::Resu
 
     let records = snakemake_log_records(log_path)?;
 
-    let mut out_file = OpenOptions::new()
+    let out_file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(output_path)?;
+
+    let mut writer: Writer<File> = WriterBuilder::new()
+        .delimiter(b'|')
+        .has_headers(true)
+        .from_writer(out_file);
 
     for record in records {
         let record = record?;
@@ -179,33 +223,7 @@ pub fn parse_snakemake_log_file(log_path: &Path, output_path: &Path) -> io::Resu
         if parsed.job_id.is_empty() {
             continue;
         }
-
-        let solved_inputs: Vec<PathBuf> = parsed
-            .inputs
-            .iter()
-            .map(|p| {
-                let pb = PathBuf::from(p);
-                fs::canonicalize(&pb).unwrap_or_else(|_| pb.to_path_buf())
-            })
-            .collect();
-
-        let input_size_bytes: u64 = solved_inputs
-            .iter()
-            .filter_map(|p| fs::metadata(p).ok())
-            .map(|m| m.len())
-            .sum();
-
-        let inputs_str = solved_inputs
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-
-        writeln!(
-            out_file,
-            "{}|{}|{}|{}|{}",
-            parsed.slurm_id, parsed.job_id, parsed.rule_name, input_size_bytes, inputs_str
-        )?;
+        writer.serialize(parsed)?;
     }
 
     // Restaurer le répertoire de travail d'origine
@@ -240,7 +258,7 @@ mod tests {
         let record: Vec<String> = vec![];
         let parsed = extract_from_record(&record);
         assert!(parsed.job_id.is_empty());
-        assert!(parsed.slurm_id.is_empty());
+        assert!(parsed.slurm_jobid.is_empty());
         assert!(parsed.inputs.is_empty());
     }
 
@@ -255,7 +273,7 @@ mod tests {
         let parsed = extract_from_record(&record);
         assert_eq!(parsed.rule_name, "my_rule");
         assert_eq!(parsed.job_id, "42");
-        assert_eq!(parsed.slurm_id, "12345");
+        assert_eq!(parsed.slurm_jobid, "12345");
         assert_eq!(parsed.inputs, vec!["file1.txt", "file2.txt"]);
     }
 
@@ -321,10 +339,17 @@ Job 3 has been submitted with SLURM jobid 60392 (log: {})."#,
             "Le fichier de sortie ne doit pas être vide"
         );
 
-        let line = output_content
-            .lines()
+        let mut output_lines = output_content.lines();
+        let header = output_lines.next().expect("Devrait avoir un header");
+
+        assert_eq!(
+            header,
+            "slurm_jobid|job_id|rule_name|input_size_bytes|inputs"
+        );
+
+        let line = output_lines
             .next()
-            .expect("Devrait contenir au moins une ligne");
+            .expect("Devrait contenir au moins une ligne d'enregistrement");
         let parts: Vec<&str> = line.split('|').collect();
 
         assert_eq!(
