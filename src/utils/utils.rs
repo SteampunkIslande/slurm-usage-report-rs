@@ -500,16 +500,16 @@ mod tests {
 
     #[test]
     fn test_job_started_previous_day() {
-        let lf = create_test_lazyframe(&[("2", "2026-02-23T22:00:00", "2026-02-24T02:00:00")]);
+        let lf = create_test_lazyframe(&[("2", "2026-02-23T22:00:00", "2026-02-24T02:30:00")]);
         let result = add_daily_duration(lf, "2026-02-24").collect().unwrap();
 
-        // From midnight (00:00) to 02:00 = 2 hours
+        // From midnight (00:00) to 02:30 = 2 hours and a half
         let daily_duration = result
             .column("daily_duration_hours")
             .unwrap()
             .get(0)
             .unwrap();
-        assert!((daily_duration.try_extract::<f64>().unwrap() - 2.0).abs() < 0.001);
+        assert!((daily_duration.try_extract::<f64>().unwrap() - 2.5).abs() < 0.001);
     }
 
     #[test]
