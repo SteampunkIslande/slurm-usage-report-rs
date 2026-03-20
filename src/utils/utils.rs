@@ -237,10 +237,10 @@ pub fn get_default_cmap() -> Vec<ColorMapEntry> {
 }
 
 /// Get a color map by name
-pub fn get_color_map(name: &str) -> Option<Vec<ColorMapEntry>> {
+pub fn get_color_map(name: &str) -> Vec<ColorMapEntry> {
     match name {
-        "default" => Some(get_default_cmap()),
-        _ => Some(get_default_cmap()),
+        "default" => get_default_cmap(),
+        _ => get_default_cmap(),
     }
 }
 
@@ -410,8 +410,7 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
 
     // Build the conditional expression for daily duration
     // Convert target_date to a string for consistent comparison
-    let target_date_str = date_str;
-    let target_date_col = lit(target_date_str).str().to_date(StrptimeOptions {
+    let target_date_col = lit(date_str).str().to_date(StrptimeOptions {
         format: Some("%Y-%m-%d".into()),
         ..Default::default()
     });
@@ -425,24 +424,23 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
         .and(end_dt.clone().dt().date().eq(target_date_col.clone()));
     // Note: subtracting two datetimes gives a Duration in microseconds.
     // Convert microseconds to hours: divide by 3600000000 (microseconds in an hour)
-    let duration_same_day =
-        (end_dt.clone() - start_dt.clone()).cast(DataType::Float64) / lit(3600000000.0);
+    let duration_same_day = (end_dt.clone() - start_dt.clone()).dt().total_hours(true);
 
     // Case 2: Job started before target day, ended on target day
     let started_before = start_dt.clone().lt(day_start_lit.clone());
     let ended_on_day = end_dt.clone().dt().date().eq(target_date_col.clone());
     let case_started_before = started_before.clone().and(ended_on_day);
     // Duration - convert microseconds to hours
-    let duration_started_before =
-        (end_dt.clone() - day_start_lit.clone()).cast(DataType::Float64) / lit(3600000000.0);
+    let duration_started_before = (end_dt.clone() - day_start_lit.clone())
+        .dt()
+        .total_hours(true);
 
     // Case 3: Job started on target day, ended after
     let started_on_day = start_dt.clone().dt().date().eq(target_date_col.clone());
     let ended_after = end_dt.gt_eq(day_end_lit.clone());
     let case_ended_after = started_on_day.and(ended_after.clone());
     // Duration - convert microseconds to hours
-    let duration_ended_after =
-        (day_end_lit - start_dt.clone()).cast(DataType::Float64) / lit(3600000000.0);
+    let duration_ended_after = (day_end_lit - start_dt.clone()).dt().total_hours(true);
 
     // Case 4: Job spanned multiple days (started before and ended after)
     let spanning = started_before.and(ended_after.clone());
