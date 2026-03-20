@@ -260,26 +260,25 @@ pub fn add_wait_time_cols(mut lf: LazyFrame) -> LazyFrame {
 
     let datetime_conversion_options: StrptimeOptions = StrptimeOptions {
         format: Some(datetime_format.into()),
-        strict: false,
-        exact: false,
         cache: true,
+        ..Default::default()
     };
 
     lf = lf.with_columns([col("Start").str().to_datetime(
-        Default::default(),
-        Default::default(),
+        None,
+        None,
         datetime_conversion_options.clone(),
         lit("raise"),
     )]);
 
     lf.with_columns([(col("Start").str().to_datetime(
-        Default::default(),
-        Default::default(),
+        None,
+        None,
         datetime_conversion_options.clone(),
         lit("raise"),
     ) - col("Submit").str().to_datetime(
-        Default::default(),
-        Default::default(),
+        None,
+        None,
         datetime_conversion_options.clone(),
         lit("raise"),
     ))
@@ -312,19 +311,18 @@ pub fn add_job_duration_cols(lf: LazyFrame) -> LazyFrame {
 
     let datetime_conversion_options: StrptimeOptions = StrptimeOptions {
         format: Some(datetime_format.into()),
-        strict: false,
-        exact: false,
         cache: true,
+        ..Default::default()
     };
 
     lf.with_columns([(col("End").str().to_datetime(
-        Default::default(),
-        Default::default(),
+        None,
+        None,
         datetime_conversion_options.clone(),
         lit("raise"),
     ) - col("Start").str().to_datetime(
-        Default::default(),
-        Default::default(),
+        None,
+        None,
         datetime_conversion_options.clone(),
         lit("raise"),
     ))
