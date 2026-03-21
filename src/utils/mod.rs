@@ -4,7 +4,9 @@
 //! including column definitions, color maps, and data transformation functions.
 
 pub mod lazyframe_edit;
-pub use lazyframe_edit::*;
+use in_place::InPlace;
+use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
 
 /// All available columns from sacct output
 pub const ALL_COLUMNS: &[&str] = &[
@@ -243,4 +245,29 @@ pub fn get_color_map(name: &str) -> Vec<ColorMapEntry> {
         "default" => get_default_cmap(),
         _ => get_default_cmap(),
     }
+}
+
+pub fn sacct_sanitizer(
+    file_name: &Path,
+    col_count: Option<u32>,
+    separator: Option<&str>,
+) -> std::io::Result<usize> {
+    let mut removed_lines = 0usize;
+    let inp = InPlace::new(file_name)
+        .open()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    let reader = BufReader::new(inp.reader());
+    let mut writer = inp.writer();
+    for line in reader.lines() {
+        let line = line?;
+        if line.split(separator.unwrap_or("|")).count() != (col_count.unwrap_or(109) - 1) as usize {
+            removed_lines += 1;
+        } else {
+            writeln!(writer, "{line}")?;
+        }
+    }
+    inp.save()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    Ok(removed_lines)
 }

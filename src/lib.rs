@@ -1,12 +1,12 @@
 pub mod post_run;
 pub mod utils;
 
+pub use post_run::*;
+pub use utils::*;
+
 use include_dir::{Dir, include_dir};
 use minijinja::Environment;
 use std::sync::LazyLock;
-
-pub use post_run::*;
-pub use utils::*;
 
 pub static TEMPLATES_DIR: LazyLock<Dir> = LazyLock::new(|| include_dir!("assets/templates"));
 
