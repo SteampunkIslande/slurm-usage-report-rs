@@ -411,7 +411,7 @@ pub fn csv_to_parquet<P: AsRef<Path>, Q: AsRef<Path>>(
         Field::new(PlSmallStr::from_str("WorkDir"), DataType::String),
     ]);
 
-    let mut lf =
+    let lf =
         LazyCsvReader::new(PlRefPath::try_from_path(input_csv.as_ref()).expect("Cannot read file"))
             .with_schema(Some(Arc::new(schema)))
             .with_separator(b'|')
@@ -419,7 +419,7 @@ pub fn csv_to_parquet<P: AsRef<Path>, Q: AsRef<Path>>(
             .finish()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-    lf = lf
+    let _ = lf
         .sink(
             SinkDestination::File {
                 target: SinkTarget::Path(
@@ -430,6 +430,8 @@ pub fn csv_to_parquet<P: AsRef<Path>, Q: AsRef<Path>>(
             FileWriteFormat::Parquet(Arc::new(ParquetWriteOptions::default())),
             UnifiedSinkArgs::default(),
         )
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .collect()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     Ok(())
