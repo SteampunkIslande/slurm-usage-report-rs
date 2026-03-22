@@ -2,10 +2,12 @@
 //!
 //! Sortie : CSV (délimiteur `|`) avec colonnes `slurm_jobid|job_id|rule_name|input_size_bytes|inputs`
 
+use chrono::NaiveDateTime;
 use csv::{Writer, WriterBuilder};
 use regex::Regex;
 use serde::Serialize;
 use serde::ser::SerializeStruct;
+use std::collections::HashSet;
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader};
@@ -265,6 +267,45 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
         .filter_map(|s| s.ok())
         .filter_map(|s| s)
         .collect())
+}
+
+/// Gets all the dates the snakemake run spanned
+///
+/// # Arguments
+///
+/// - `log_path` (`&Path`) - Path to a snakemake log
+///
+/// # Returns
+///
+/// - `Vec<String>` - All the dates from the beginning of the snakemake run to the end,
+/// using format `YY-mm-DD`
+pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
+    let file = File::open(log_path);
+    let file = match file {
+        Ok(f) => f,
+        Err(_) => return HashSet::new(),
+    };
+
+    let reader = BufReader::new(file);
+
+    let mut dates: HashSet<String> = HashSet::new();
+
+    for line in reader.lines() {
+        let line = line.unwrap_or("".to_string());
+
+        // Cherche un pattern entre crochets
+        if let Some(start) = line.find('[') {
+            if let Some(end) = line.find(']') {
+                let raw = &line[start + 1..end];
+
+                // Exemple: "Thu Mar  5 11:45:18 2026"
+                if let Ok(dt) = NaiveDateTime::parse_from_str(raw, "%a %b %e %H:%M:%S %Y") {
+                    dates.insert(dt.format("%Y-%m-%D").to_string());
+                }
+            }
+        }
+    }
+    dates
 }
 
 #[cfg(test)]

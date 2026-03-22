@@ -1,6 +1,10 @@
 use clap::Parser;
 use slurm_usage_report_rs::{sacct_get, snakemake_parse_log, utils};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use crate::cli::Cli;
 
@@ -32,7 +36,7 @@ pub struct PostRunCmd {
     ///
     /// Permet de contourner sacct en cherchant directement les données dans les fichiers parquet
     #[arg(short, long)]
-    db: Option<String>,
+    db: Option<PathBuf>,
 }
 
 impl PostRunCmd {
@@ -42,9 +46,29 @@ impl PostRunCmd {
         )
         .expect("Error reading log files:");
 
-        let parquets_of_interest: Vec<PathBuf> = match &self.db {
+        snakemake_parse_log::parse_snakemake_log_files(
+            &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
+            &Path::new("input_sizes.csv"),
+        )
+        .expect("Error trying to get input sizes");
+
+        // Raw parquet files that will be used to analyze slurm usage for snakemake runs given as input
+        let sacct_parquets: Vec<PathBuf> = match &self.db {
             Some(db) => {
-                todo!()
+                if !db.exists() {
+                    panic!("{} doesn't exist", db.display());
+                } else {
+                    let mut dates: HashSet<String> = HashSet::new();
+                    for path in &self.input {
+                        dates.extend(snakemake_parse_log::get_snakemake_run_span(path.as_path()));
+                    }
+                    let input_parquets: Vec<PathBuf> = dates
+                        .into_iter()
+                        .map(|p| db.join(p).with_added_extension("parquet"))
+                        .filter(|p| p.exists())
+                        .collect();
+                    input_parquets
+                }
             }
             None => {
                 sacct_get::get_sacct_for_runs(
@@ -58,9 +82,13 @@ impl PostRunCmd {
                 let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)
                     .expect("Error trying to sanitize sacct CSV");
                 if cli.verbose {
-                    eprintln!("Removed {} from SACCT output", removed_lines);
+                    eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
-                todo!()
+                vec![
+                    PathBuf::from_str("sacct.csv")
+                        .expect("Cannot get path sacct.csv")
+                        .with_extension("parquet"),
+                ]
             }
         };
     }
