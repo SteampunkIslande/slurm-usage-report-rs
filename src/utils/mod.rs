@@ -3,7 +3,6 @@
 //! This module provides utility functions for processing SLURM job data,
 //! including column definitions, color maps, and data transformation functions.
 
-pub mod lazyframe_edit;
 use in_place::InPlace;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
