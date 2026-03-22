@@ -1740,6 +1740,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "in_place_macro"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea09faadd61e6b3f9eccbfd9323d320a890fe9de85b45fb75aa73a9c831cbe0a"
+dependencies = [
+ "clap",
+ "proc-macro-error2",
+ "proc-macro2",
+ "quote",
+ "runtime-macros",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "include_dir"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2894,6 +2908,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-error-attr2"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "proc-macro-error2"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
+dependencies = [
+ "proc-macro-error-attr2",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3340,6 +3376,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "runtime-macros"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34bef7b9430b9f9e666d930202e1344765b623203affe2f779bcd1f269384248"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "rust_decimal"
 version = "1.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3715,6 +3762,7 @@ dependencies = [
  "csv",
  "duckdb",
  "in-place",
+ "in_place_macro",
  "include_dir",
  "minijinja",
  "plotly",

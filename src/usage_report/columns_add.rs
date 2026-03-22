@@ -14,6 +14,10 @@
 //! 2. Convert units using functions in conversions module
 //! 3. Aggregate using functions in aggregates module
 
+use std::{io, path::Path};
+
+use duckdb::Connection;
+use in_place_macro::auto_rename;
 use polars::prelude::*;
 
 /// Adds JobRoot and JobInfoType columns based on JobID.
@@ -504,6 +508,42 @@ pub fn parse_total_cpu_col(mut lf: LazyFrame) -> LazyFrame {
     lf = lf.drop(by_name(["_days", "_hours"], true, false));
 
     lf
+}
+
+/// Adds columns to input_parquet (in-place)
+///
+/// # Arguments
+///
+/// - `input_parquet` (`&str`) - Parquet file to add columns to.
+/// - `input_sizes` (`&str`) - Path to a csv file.
+/// - `output_parquet` (`&str`) - Describe this parameter.
+#[auto_rename(output_parquet overwrites input_parquet)]
+pub fn add_metrics_relative_to_input_size(
+    input_parquet: &Path,
+    input_sizes: &Path,
+    output_parquet: &Path,
+) -> io::Result<()> {
+    let conn: Connection =
+        duckdb::Connection::open_in_memory().expect("Cannot initialize duckdb connection");
+    let query = format!(
+        r#"
+        COPY (
+            SELECT *,
+                ((run_metrics.ElapsedRaw / 60.0) / (insizes.input_size_bytes / pow(2, 20))) AS MinPerMo,
+                ((run_metrics.ReqMem / pow(2, 20)) / (insizes.input_size_bytes / pow(2, 20))) AS UsedRAMPerMo
+            FROM read_parquet('{}') run_metrics
+            LEFT JOIN read_csv('{}', delim='|') insizes
+            ON insizes.slurm_jobid = run_metrics.JobID
+               AND insizes.input_size_bytes != 0
+        ) TO '{}'
+        "#,
+        input_parquet.display(),
+        input_sizes.display(),
+        output_parquet.display()
+    );
+
+    conn.execute(&query, [])
+        .expect("Erreur lors de l'édition du fichier parquet");
 }
 
 #[cfg(test)]
