@@ -2,6 +2,8 @@ use clap::Parser;
 use slurm_usage_report_rs::{sacct_get, snakemake_parse_log, utils};
 use std::path::{Path, PathBuf};
 
+use crate::cli::Cli;
+
 const LONG_ABOUT: &'static str = concat!(
     "Script post-run pour générer un rapport d'usage Slurm à partir des logs de Snakemake.\n\n",
     "Possibilité de spécifier plusieurs fichiers de log (ex: .snakemake/log/xxx.log) pour consolider les métriques\n",
@@ -34,7 +36,7 @@ pub struct PostRunCmd {
 }
 
 impl PostRunCmd {
-    pub fn run(&self) {
+    pub fn run(&self, cli: &Cli) {
         let slurm_job_names = snakemake_parse_log::get_slurm_ids(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
         )
@@ -53,8 +55,11 @@ impl PostRunCmd {
                     Path::new("sacct.csv"),
                 )
                 .expect("Error trying to get sacct info");
-                utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)
+                let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)
                     .expect("Error trying to sanitize sacct CSV");
+                if cli.verbose {
+                    eprintln!("Removed {} from SACCT output", removed_lines);
+                }
                 todo!()
             }
         };

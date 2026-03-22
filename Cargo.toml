@@ -16,6 +16,7 @@ polars = { version = "0.53.0", features = [
     "parquet",
     "strings",
     "regex",
+    "csv",
 ] }
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
