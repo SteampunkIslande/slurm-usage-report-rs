@@ -196,7 +196,11 @@ fn extract_from_record(record_lines: &[String]) -> ParsedRecord {
 /// # Errors
 ///
 /// Retourne une erreur si le fichier de log ou le fichier de sortie ne peut pas être ouvert/lu/écrit.
-pub fn parse_snakemake_log_file(log_path: &Path, output_path: &Path) -> io::Result<()> {
+fn parse_snakemake_log_file(
+    log_path: &Path,
+    output_path: &Path,
+    write_header: bool,
+) -> io::Result<()> {
     let original_dir = env::current_dir()?;
 
     if let Some(project_dir) = find_project_dir(log_path) {
@@ -212,7 +216,7 @@ pub fn parse_snakemake_log_file(log_path: &Path, output_path: &Path) -> io::Resu
 
     let mut writer: Writer<File> = WriterBuilder::new()
         .delimiter(b'|')
-        .has_headers(true)
+        .has_headers(write_header)
         .from_writer(out_file);
 
     for record in records {
@@ -232,9 +236,43 @@ pub fn parse_snakemake_log_file(log_path: &Path, output_path: &Path) -> io::Resu
     Ok(())
 }
 
+pub fn parse_snakemake_log_files(log_paths: &[&Path], output_path: &Path) -> io::Result<()> {
+    for (i, log_path) in log_paths.iter().enumerate() {
+        parse_snakemake_log_file(log_path, output_path, i == 0)?;
+    }
+    Ok(())
+}
+
+pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
+    Ok(log_paths
+        .iter()
+        .map(|p| {
+            File::open(p).map(BufReader::new).and_then(|f| {
+                Ok(f.lines()
+                    .filter_map(|s| match s {
+                        Ok(s) => {
+                            if s.contains("SLURM run ID") {
+                                Some(s)
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_) => None,
+                    })
+                    .next())
+            })
+        })
+        .filter_map(|s| s.ok())
+        .filter_map(|s| s)
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_get_slurm_ids() {}
 
     #[test]
     fn test_find_project_dir_valid() {
@@ -320,7 +358,7 @@ Job 3 has been submitted with SLURM jobid 60392 (log: {})."#,
         let output_file = temp_dir.path().join("output.csv");
 
         // Appeler la fonction publique à tester
-        parse_snakemake_log_file(&log_path, &output_file)?;
+        parse_snakemake_log_file(&log_path, &output_file, true)?;
 
         // Vérifier que le fichier de sortie existe et contient les données attendues
         let output_content = std::fs::read_to_string(&output_file)?;

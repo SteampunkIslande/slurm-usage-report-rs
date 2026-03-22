@@ -33,5 +33,14 @@ pub struct PostRunCmd {
 }
 
 impl PostRunCmd {
-    pub fn run(&self) {}
+    pub fn run(&self) {
+        let parquets_of_interest: Vec<PathBuf> = match &self.db {
+            Some(db) => {
+                todo!()
+            }
+            None => {
+                todo!()
+            }
+        };
+    }
 }
