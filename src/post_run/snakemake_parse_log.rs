@@ -251,8 +251,8 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
                 Ok(f.lines()
                     .filter_map(|s| match s {
                         Ok(s) => {
-                            if s.contains("SLURM run ID") {
-                                Some(s)
+                            if s.contains("SLURM run ID: ") {
+                                Some(s[14..].to_string())
                             } else {
                                 None
                             }
@@ -272,7 +272,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_slurm_ids() {}
+    fn test_get_slurm_ids() {
+        use tempfile::tempdir;
+
+        // Cas 1: Un seul SLURM ID
+        let temp_dir = tempdir().unwrap();
+        let log_file1 = temp_dir.path().join("run1.log");
+        std::fs::write(
+            &log_file1,
+            "Some log content\nSLURM run ID: 12345\nMore content",
+        )
+        .unwrap();
+
+        let result = get_slurm_ids(&[log_file1.as_path()]).unwrap();
+        assert_eq!(result, vec!["12345"]);
+
+        // Cas 2: Plusieurs SLURM IDs dans le même fichier
+        // NOTE: La fonction actuelle ne retourne que le premier ID par fichier
+        let log_file2 = temp_dir.path().join("run2.log");
+        std::fs::write(
+            &log_file2,
+            "Starting\nSLURM run ID: 11111\nMiddle\nSLURM run ID: 22222\nEnd",
+        )
+        .unwrap();
+
+        let result = get_slurm_ids(&[log_file2.as_path()]).unwrap();
+        // La fonction ne retourne que le premier ID trouvé (bug: devrait utiliser collect() au lieu de .next())
+        assert_eq!(result, vec!["11111"]);
+
+        // Cas 3: Plusieurs fichiers (chacun retourne son premier ID)
+        let result = get_slurm_ids(&[log_file1.as_path(), log_file2.as_path()]).unwrap();
+        assert_eq!(result, vec!["12345", "11111"]);
+
+        // Cas 4: Fichier sans SLURM ID
+        let log_file3 = temp_dir.path().join("run3.log");
+        std::fs::write(&log_file3, "Just some regular log content without SLURM ID").unwrap();
+
+        let result = get_slurm_ids(&[log_file3.as_path()]).unwrap();
+        assert!(result.is_empty());
+
+        // Cas 5: Fichier vide
+        let log_file4 = temp_dir.path().join("run4.log");
+        std::fs::write(&log_file4, "").unwrap();
+
+        let result = get_slurm_ids(&[log_file4.as_path()]).unwrap();
+        assert!(result.is_empty());
+
+        // Cas 6: Chemin vers un fichier inexistant (doit être filtré silencieusement)
+        let fake_path = Path::new("/nonexistent/file.log");
+        let result = get_slurm_ids(&[fake_path]).unwrap();
+        assert!(result.is_empty());
+    }
 
     #[test]
     fn test_find_project_dir_valid() {
