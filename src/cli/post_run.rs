@@ -69,8 +69,8 @@ impl PostRunCmd {
         // Raw parquet files that will be used to analyze slurm usage for snakemake runs given as input
         match &self.db {
             Some(db) => {
-                if !db.exists() {
-                    panic!("{} doesn't exist", db.display());
+                if !db.exists() || !db.is_dir() {
+                    panic!("{} should be an existing directory!", db.display());
                 } else {
                     let mut dates: HashSet<String> = HashSet::new();
                     for path in &self.input {

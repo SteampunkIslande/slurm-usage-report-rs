@@ -453,10 +453,10 @@ pub fn merge_parquets(inputs: &[&Path], output: &Path) {
         ) TO '{output}'
         "#,
         input_parquets = format!(
-            "'{}'",
+            "[{}]",
             inputs
                 .iter()
-                .map(|p| p.display().to_string())
+                .map(|p| format!("'{}'", p.display()))
                 .collect::<Vec<String>>()
                 .join(",")
         ),

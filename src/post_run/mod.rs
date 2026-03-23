@@ -266,6 +266,7 @@ pub fn generate_snakemake_efficiency_report(
         .open(output_html)
         .expect("Cannot open file to write");
     write!(f, "{}", output).expect("Cannot write report!");
+
     if let Some(output_parquet) = output_parquet {
         utils::sink_parquet(lf.clone(), output_parquet).expect("Cannot write parquet");
     }
