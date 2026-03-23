@@ -1,4 +1,5 @@
 pub mod snakemake_rules_plot;
+
 pub use snakemake_rules_plot::*;
 
 pub mod snakemake_parse_log;
@@ -6,3 +7,266 @@ pub use snakemake_parse_log::*;
 
 pub mod sacct_get;
 pub use sacct_get::*;
+
+use std::{fs::OpenOptions, path::Path};
+
+use crate::{
+    JINJA_ENV, add_metrics_relative_to_input_size, add_snakerule_col, aggregate_per_snakemake_rule,
+    generic_report, utils,
+};
+
+pub fn generate_snakemake_efficiency_report(
+    output_html: &Path,
+    input_parquet: &Path,
+    job_names: &[&str],
+    output_parquet: Option<&Path>,
+    input_sizes_csv: Option<&Path>,
+) {
+    use crate::utils::sink_parquet;
+    use polars::prelude::*;
+    use serde_json::json;
+    use std::io::Write;
+
+    let args = ScanArgsParquet::default();
+    let mut lf = LazyFrame::scan_parquet(
+        PlRefPath::try_from_path(input_parquet).expect("Mince alors"),
+        args,
+    )
+    .expect("Impossible de charger le fichier parquet d'entrée");
+
+    lf = generic_report(lf);
+    for job_name in job_names {
+        lf = lf.filter(
+            col("JobName")
+                .str()
+                .contains(lit(job_name.to_string()), false),
+        );
+    }
+    lf = add_snakerule_col(lf);
+
+    if let Some(input_sizes) = input_sizes_csv {
+        // Sauvegarder le parquet en cours de lecture par le lazyframe, car on s'apprête à écrire dedans
+        let parquet_temp = input_parquet.with_extension("tmp.parquet");
+        sink_parquet(lf, &parquet_temp).expect(&format!(
+            "Impossible d'écrire dans {}",
+            parquet_temp.display()
+        ));
+
+        // Cette fonction est `in-place`, c'est à dire qu'elle est conçue pour prendre le même chemin en entrée et en sortie
+        // En l'occurence, le fichier temporaire que l'on vient de créer
+        add_metrics_relative_to_input_size(
+            parquet_temp.as_path(),
+            input_sizes,
+            parquet_temp.as_path(),
+        )
+        .expect("Impossible d'ajouter les metrics relatives aux fichiers d'entrée");
+
+        // Plus besoin du fichier temporaire, on remplace input_parquet par le fichier enrichi
+        std::fs::rename(parquet_temp, input_parquet).expect("Impossible de renommer");
+
+        // input_parquet a été enrichi, on le réouvre sous forme de Layframe pour continuer l'extraction des données
+        lf = LazyFrame::scan_parquet(
+            PlRefPath::try_from_path(input_parquet).expect("Impossible de convertir un chemin"),
+            ScanArgsParquet::default(),
+        )
+        .expect("Problème à l'étape d'enrichissement avec input-sizes.csv");
+    }
+
+    let mem_box_plot = plot_snakemake_rules(
+        &lf,
+        "MemEfficiencyPercent",
+        "Efficacité mémoire (en %)",
+        Some("memef_percent"),
+    )
+    .expect("Cannot plot memory efficiency for rules!");
+
+    let cpu_box_plot = plot_snakemake_rules(
+        &lf,
+        "CPUEfficiencyPercent",
+        "Taux d'utilisation des CPUs",
+        Some("cpuef_percent"),
+    )
+    .expect("Cannot plot CPU efficiency for rules");
+
+    let runtime_box_plot = plot_snakemake_rules(
+        &lf,
+        "ElapsedRaw",
+        "Durée d'exécution (en secondes)",
+        Some("runtime_seconds"),
+    )
+    .expect("Cannot plot ElapsedRaw for rules");
+
+    let relative_mem_box_plot = if input_sizes_csv.is_some() {
+        Some(
+            plot_snakemake_rules(
+                &lf,
+                "UsedRAMPerMo",
+                "Quantité de RAM utilisée (en Mo) par Mo de fichier(s) d'entrée",
+                Some("relative_ram_per_inputmo"),
+            )
+            .expect("Cannot plot relative memory usage for rules"),
+        )
+    } else {
+        None
+    };
+    let relative_runtime_box_plot = if input_sizes_csv.is_some() {
+        Some(
+            plot_snakemake_rules(
+                &lf,
+                "MinPerMo",
+                "Durée d'exécution (en minutes) par Mo de fichier(s) d'entrée",
+                Some("min_per_input_mo"),
+            )
+            .expect("Cannot plot relative runtime for rules"),
+        )
+    } else {
+        None
+    };
+
+    lf = aggregate_per_snakemake_rule(lf, input_sizes_csv.is_some());
+    let efficiency_table_mem = utils::df_to_columnar_json(
+        &(lf.clone()
+            .select(&[
+                col("rule_name"),
+                col("MemEfficiencyPercent_mean"),
+                col("MemEfficiencyPercent_median"),
+                col("MemEfficiencyPercent_std"),
+                col("MemEfficiencyPercent_min"),
+                col("MemEfficiencyPercent_max"),
+            ])
+            .sort(["rule_name"], SortMultipleOptions::default())
+            .select(&[
+                col("rule_name").alias("Nom de la règle"),
+                col("MemEfficiencyPercent_mean").alias("Efficacité mémoire moyenne"),
+                col("MemEfficiencyPercent_median").alias("Efficacité mémoire médiane"),
+                col("MemEfficiencyPercent_std").alias("Efficacité mémoire (écart-type)"),
+                col("MemEfficiencyPercent_min").alias("Efficacité mémoire minimum"),
+                col("MemEfficiencyPercent_max").alias("Efficacité mémoire maximum"),
+            ])
+            .collect()
+            .expect("Cannot collect")),
+    );
+    let efficiency_table_cpu = utils::df_to_columnar_json(
+        &(lf.clone()
+            .select(&[
+                col("rule_name"),
+                col("CPUEfficiencyPercent_mean"),
+                col("CPUEfficiencyPercent_median"),
+                col("CPUEfficiencyPercent_std"),
+                col("CPUEfficiencyPercent_min"),
+                col("CPUEfficiencyPercent_max"),
+            ])
+            .sort(["rule_name"], SortMultipleOptions::default())
+            .select(&[
+                col("rule_name").alias("Nom de la règle"),
+                col("CPUEfficiencyPercent_mean").alias("Efficacité CPU moyenne"),
+                col("CPUEfficiencyPercent_median").alias("Efficacité CPU médiane"),
+                col("CPUEfficiencyPercent_std").alias("Efficacité CPU (écart-type)"),
+                col("CPUEfficiencyPercent_min").alias("Efficacité CPU minimum"),
+                col("CPUEfficiencyPercent_max").alias("Efficacité CPU maximum"),
+            ])
+            .collect()
+            .expect("Cannot collect")),
+    );
+    let efficiency_table_runtime = utils::df_to_columnar_json(
+        &(lf.clone()
+            .select(&[
+                col("rule_name"),
+                col("ElapsedRaw_mean"),
+                col("ElapsedRaw_median"),
+                col("ElapsedRaw_std"),
+                col("ElapsedRaw_min"),
+                col("ElapsedRaw_max"),
+            ])
+            .sort(["rule_name"], SortMultipleOptions::default())
+            .select(&[
+                col("rule_name").alias("Nom de la règle"),
+                col("ElapsedRaw_mean").alias("Durée moyenne"),
+                col("ElapsedRaw_median").alias("Durée médiane"),
+                col("ElapsedRaw_std").alias("Durée (écart-type)"),
+                col("ElapsedRaw_min").alias("Durée minimum"),
+                col("ElapsedRaw_max").alias("Durée maximum"),
+            ])
+            .collect()
+            .expect("Yash")),
+    );
+    let efficiency_table_relative_mem = if input_sizes_csv.is_some() {
+        Some(utils::df_to_columnar_json(
+            &(lf.clone()
+                .select(&[
+                    col("rule_name"),
+                    col("UsedRAMPerMo_mean"),
+                    col("UsedRAMPerMo_median"),
+                    col("UsedRAMPerMo_std"),
+                    col("UsedRAMPerMo_min"),
+                    col("UsedRAMPerMo_max"),
+                ])
+                .sort(["rule_name"], SortMultipleOptions::default())
+                .select(&[
+                    col("rule_name").alias("Nom de la règle"),
+                    col("UsedRAMPerMo_mean").alias("RAM utilisée par Mo (moyenne)"),
+                    col("UsedRAMPerMo_median").alias("RAM utilisée par Mo (médiane)"),
+                    col("UsedRAMPerMo_std").alias("RAM utilisée par Mo (écart-type)"),
+                    col("UsedRAMPerMo_min").alias("RAM utilisée par Mo (minimum)"),
+                    col("UsedRAMPerMo_max").alias("RAM utilisée par Mo (maximum)"),
+                ])
+                .collect()
+                .expect("Cannot collect")),
+        ))
+    } else {
+        None
+    };
+    let efficiency_table_relative_runtime = if input_sizes_csv.is_some() {
+        Some(utils::df_to_columnar_json(
+            &(lf.clone()
+                .select(&[
+                    col("rule_name"),
+                    col("MinPerMo_mean"),
+                    col("MinPerMo_median"),
+                    col("MinPerMo_std"),
+                    col("MinPerMo_min"),
+                    col("MinPerMo_max"),
+                ])
+                .sort(["rule_name"], SortMultipleOptions::default())
+                .select(&[
+                    col("rule_name").alias("Nom de la règle"),
+                    col("MinPerMo_mean").alias("Minutes par Mo (moyenne)"),
+                    col("MinPerMo_median").alias("Minutes par Mo (médiane)"),
+                    col("MinPerMo_std").alias("Minutes par Mo (écart-type)"),
+                    col("MinPerMo_min").alias("Minutes par Mo (minimum)"),
+                    col("MinPerMo_max").alias("Minutes par Mo (maximum)"),
+                ])
+                .collect()
+                .expect("Cannot collect")),
+        ))
+    } else {
+        None
+    };
+    let template = JINJA_ENV
+        .get_template("snakemake_report_template.html.j2")
+        .expect("Template cannot be found");
+    let output = template
+        .render(json! (
+        {
+            "mem_box_plot": mem_box_plot,
+            "cpu_box_plot": cpu_box_plot,
+            "runtime_box_plot": runtime_box_plot,
+            "relative_mem_box_plot": relative_mem_box_plot,
+            "relative_runtime_box_plot": relative_runtime_box_plot,
+            "efficiency_table_mem": efficiency_table_mem,
+            "efficiency_table_cpu": efficiency_table_cpu,
+            "efficiency_table_runtime": efficiency_table_runtime,
+            "efficiency_table_relative_mem": efficiency_table_relative_mem,
+            "efficiency_table_relative_runtime": efficiency_table_relative_runtime,
+        }))
+        .expect("Jinja render error!");
+    let mut f = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(output_html)
+        .expect("Cannot open file to write");
+    write!(f, "{}", output).expect("Cannot write report!");
+    if let Some(output_parquet) = output_parquet {
+        utils::sink_parquet(lf.clone(), output_parquet).expect("Cannot write parquet");
+    }
+}

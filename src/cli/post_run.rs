@@ -3,7 +3,6 @@ use slurm_usage_report_rs::{sacct_get, snakemake_parse_log, utils};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 use crate::cli::Cli;
@@ -32,6 +31,14 @@ pub struct PostRunCmd {
     #[arg(long)]
     output_parquet: Option<PathBuf>,
 
+    /// Conserver tous les fichiers de sortie intermédiaires.
+    ///
+    /// Concerne:
+    /// - `sacct.parquet` (si `--db` n'est pas précisé): le résultat de la commande sacct pour les runs spécifiés (au format parquet)
+    /// - `input_sizes.csv`: la liste des `slurm_jobid`, `job_id`, `rule_name`, `input_size_bytes`, `inputs` pour chaque job snakemake.
+    #[arg(long, short)]
+    keep_all_outputs: bool,
+
     /// Chemin vers la base de données SACCT maison du cluster (dossier avec les fichiers parquet).
     ///
     /// Permet de contourner sacct en cherchant directement les données dans les fichiers parquet
@@ -52,8 +59,15 @@ impl PostRunCmd {
         )
         .expect("Error trying to get input sizes");
 
+        let temp_sacct_csv = if self.db.is_none() {
+            Some(Path::new("sacct.csv"))
+        } else {
+            None
+        };
+
+        let temp_sacct_parquet = PathBuf::from("sacct.parquet");
         // Raw parquet files that will be used to analyze slurm usage for snakemake runs given as input
-        let sacct_parquets: Vec<PathBuf> = match &self.db {
+        match &self.db {
             Some(db) => {
                 if !db.exists() {
                     panic!("{} doesn't exist", db.display());
@@ -67,7 +81,13 @@ impl PostRunCmd {
                         .map(|p| db.join(p).with_added_extension("parquet"))
                         .filter(|p| p.exists())
                         .collect();
-                    input_parquets
+                    utils::merge_parquets(
+                        &input_parquets
+                            .iter()
+                            .map(|p| p.as_path())
+                            .collect::<Vec<_>>(),
+                        &temp_sacct_parquet,
+                    );
                 }
             }
             None => {
@@ -76,7 +96,7 @@ impl PostRunCmd {
                         .iter()
                         .map(|s| s.as_str())
                         .collect::<Vec<_>>(),
-                    Path::new("sacct.csv"),
+                    temp_sacct_csv.expect("Logical error"),
                 )
                 .expect("Error trying to get sacct info");
                 let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)
@@ -84,12 +104,19 @@ impl PostRunCmd {
                 if cli.verbose {
                     eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
-                vec![
-                    PathBuf::from_str("sacct.csv")
-                        .expect("Cannot get path sacct.csv")
-                        .with_extension("parquet"),
-                ]
             }
-        };
+        }
+        use slurm_usage_report_rs::post_run::generate_snakemake_efficiency_report;
+
+        generate_snakemake_efficiency_report(
+            &self.output_html,
+            &temp_sacct_parquet,
+            &slurm_job_names
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>(),
+            self.output_parquet.as_deref(),
+            Some(Path::new("input_sizes.csv")),
+        );
     }
 }

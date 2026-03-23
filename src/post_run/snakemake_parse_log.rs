@@ -188,8 +188,6 @@ fn extract_from_record(record_lines: &[String]) -> ParsedRecord {
     parsed
 }
 
-// ── Fonction publique ───────────────────────────────────────────────────────
-
 /// Parser un fichier de log Snakemake et écrire les résultats (append) dans `output_path`.
 ///
 /// Le format de sortie est un CSV délimité par `|` avec les colonnes :

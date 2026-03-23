@@ -12,6 +12,10 @@ use std::sync::LazyLock;
 
 pub static TEMPLATES_DIR: LazyLock<Dir> = LazyLock::new(|| include_dir!("assets/templates"));
 
+fn format_header(s: &str) -> String {
+    s.replace("_", "\n")
+}
+
 pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
     let mut environment: Environment = Environment::new();
     environment.set_loader(move |name| {
@@ -25,5 +29,6 @@ pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
             Ok(None)
         }
     });
+    environment.add_filter("format_header", format_header);
     environment
 });

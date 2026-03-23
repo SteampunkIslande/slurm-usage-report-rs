@@ -4,6 +4,8 @@
 //! including column definitions, color maps, and data transformation functions.
 
 use in_place::InPlace;
+use polars::prelude::*;
+use serde_json::{Value, json};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
 
@@ -271,8 +273,6 @@ pub fn sacct_sanitizer(
     Ok(removed_lines)
 }
 
-use polars::prelude::*;
-
 /// Convert a CSV file to Parquet format
 ///
 /// # Arguments
@@ -419,12 +419,17 @@ pub fn csv_to_parquet<P: AsRef<Path>, Q: AsRef<Path>>(
             .finish()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
+    sink_parquet(lf, output_parquet.as_ref())?;
+
+    Ok(())
+}
+
+pub fn sink_parquet(lf: LazyFrame, path: &Path) -> io::Result<()> {
     let _ = lf
         .sink(
             SinkDestination::File {
                 target: SinkTarget::Path(
-                    PlRefPath::try_from_path(output_parquet.as_ref())
-                        .expect("Cannot get Path from Path"),
+                    PlRefPath::try_from_path(path).expect("Cannot get Path from Path"),
                 ),
             },
             FileWriteFormat::Parquet(Arc::new(ParquetWriteOptions::default())),
@@ -433,6 +438,81 @@ pub fn csv_to_parquet<P: AsRef<Path>, Q: AsRef<Path>>(
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
         .collect()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
     Ok(())
+}
+
+pub fn merge_parquets(inputs: &[&Path], output: &Path) {
+    use duckdb::Connection;
+
+    let conn: Connection =
+        duckdb::Connection::open_in_memory().expect("Cannot initialize duckdb connection");
+    let query = format!(
+        r#"
+        COPY (
+            SELECT * FROM read_parquet({input_parquets},union_by_name=true)
+        ) TO '{output}'
+        "#,
+        input_parquets = format!(
+            "'{}'",
+            inputs
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        ),
+        output = output.display()
+    );
+
+    conn.execute(&query, [])
+        .expect("Impossible de fusionner les fichiers parquet");
+}
+
+fn anyvalue_to_json(v: AnyValue) -> Value {
+    match v {
+        AnyValue::Null => Value::Null,
+
+        AnyValue::Boolean(v) => json!(v),
+
+        AnyValue::Int8(v) => json!(v),
+        AnyValue::Int16(v) => json!(v),
+        AnyValue::Int32(v) => json!(v),
+        AnyValue::Int64(v) => json!(v),
+
+        AnyValue::UInt8(v) => json!(v),
+        AnyValue::UInt16(v) => json!(v),
+        AnyValue::UInt32(v) => json!(v),
+        AnyValue::UInt64(v) => json!(v),
+
+        AnyValue::Float32(v) => json!(v),
+        AnyValue::Float64(v) => json!(v),
+
+        AnyValue::String(v) => json!(v),
+        AnyValue::StringOwned(v) => json!(v),
+
+        // Dates / Datetime → string ISO (simple et safe)
+        AnyValue::Date(v) => json!(v.to_string()),
+        AnyValue::Datetime(v, _, _) => json!(v.to_string()),
+
+        // Fallback (Struct, List, etc.)
+        _ => json!(v.to_string()),
+    }
+}
+
+pub fn df_to_columnar_json(df: &DataFrame) -> Value {
+    let mut map = serde_json::Map::new();
+
+    for col in df.columns() {
+        let name = col.name().to_string();
+
+        let values: Vec<Value> = col
+            .as_series()
+            .expect("Cannot get series")
+            .iter()
+            .map(anyvalue_to_json)
+            .collect();
+
+        map.insert(name, Value::Array(values));
+    }
+
+    Value::Object(map)
 }

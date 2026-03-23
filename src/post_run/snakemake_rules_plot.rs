@@ -34,7 +34,7 @@ use plotly::{
 /// N'inclus pas le script de plotly.js, celui-ci doit être ajouté au header
 /// du document html dans lequel ce graphique est utilisé
 pub fn plot_snakemake_rules(
-    lf: LazyFrame,
+    lf: &LazyFrame,
     column: &str,
     title: &str,
     div_name: Option<&str>,
@@ -136,7 +136,7 @@ mod tests {
         .lazy();
 
         let res = plot_snakemake_rules(
-            lf,
+            &lf,
             "runtime",
             "Durée d'exécution (en minutes) par règle",
             Some("test_div"),
