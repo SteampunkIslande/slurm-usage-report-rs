@@ -35,6 +35,7 @@ pub fn generate_snakemake_efficiency_report(
     .expect("Impossible de charger le fichier parquet d'entrée");
 
     lf = generic_report(lf);
+    // Filter by job name, only after the aggregate is done
     for job_name in job_names {
         lf = lf.filter(
             col("JobName")

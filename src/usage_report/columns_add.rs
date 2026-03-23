@@ -64,6 +64,7 @@ pub fn add_slurm_jobinfo_type_columns(mut lf: LazyFrame) -> LazyFrame {
         .alias("JobInfoType");
 
     lf = lf.with_columns([job_info_type]);
+    lf = lf.drop(by_name(["_JobSuffix"], true, false));
 
     lf
 }

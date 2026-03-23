@@ -30,23 +30,22 @@ use polars::prelude::*;
 ///
 /// # Returns
 /// A new LazyFrame with aggregated metrics per group
-pub fn aggregate_per_alloc(lf: LazyFrame, group_col: &str) -> LazyFrame {
+pub fn aggregate_per_alloc(mut lf: LazyFrame, group_col: &str) -> LazyFrame {
     // Build aggregation expressions for common column types
     // We'll aggregate all columns that exist in the dataframe
-    let aggs: Vec<Expr> = vec![
-        // Numeric columns - take max
-        col("AllocCPUS").max(),
-        col("ElapsedRaw").max(),
-        col("CPUTimeRAW").max(),
-        col("MaxRSS").max(),
-        col("ReqMem").max(),
-        // String columns - take first non-null
-        col("Account").drop_nulls().first(),
-        col("NodeList").drop_nulls().first(),
-        col("QOS").drop_nulls().first(),
-        col("JobName").drop_nulls().first(),
-        col("User").drop_nulls().first(),
-    ];
+    // If a column is a numeric type, aggregate using the highest value. Otherwise, just take the first non-null value.
+    let aggs: Vec<Expr> = lf
+        .collect_schema()
+        .expect("Error collecting schema")
+        .iter_names_and_dtypes()
+        .map(|(name, dtype)| {
+            if dtype.is_numeric() {
+                col(name.clone()).max()
+            } else {
+                col(name.clone()).drop_nulls().first()
+            }
+        })
+        .collect();
 
     lf.group_by([col(group_col)]).agg(aggs)
 }
