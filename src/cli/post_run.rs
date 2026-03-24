@@ -109,10 +109,8 @@ impl PostRunCmd {
                         line: line!(),
                         column: column!(),
                     })?,
-                )
-                .expect("Error trying to get sacct info");
-                let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)
-                    .expect("Error trying to sanitize sacct CSV");
+                )?;
+                let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)?;
                 if cli.verbose {
                     eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
@@ -129,7 +127,7 @@ impl PostRunCmd {
                 .collect::<Vec<_>>(),
             self.output_parquet.as_deref(),
             Some(Path::new("input_sizes.csv")),
-        );
+        )?;
         Ok(())
     }
 }

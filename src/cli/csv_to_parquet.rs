@@ -1,5 +1,5 @@
 use clap::Parser;
-use slurm_usage_report_rs::utils;
+use slurm_usage_report_rs::{UsageReportError, utils};
 use std::path::PathBuf;
 
 use crate::cli::Cli;
@@ -21,15 +21,15 @@ pub struct CsvToParquet {
 }
 
 impl CsvToParquet {
-    pub fn run(&self, _cli: &Cli) {
+    pub fn run(&self, _cli: &Cli) -> Result<(), UsageReportError> {
         if self.output.exists() && !self.force {
             eprintln!(
                 "{} already exists! You can pass the --force flag if you want to overwrite it",
                 self.output.display()
             );
         } else {
-            utils::csv_to_parquet(self.input.as_path(), self.output.as_path())
-                .expect("Error while converting CSV to parquet");
+            utils::csv_to_parquet(self.input.as_path(), self.output.as_path())?;
         }
+        Ok(())
     }
 }

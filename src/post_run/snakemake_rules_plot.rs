@@ -15,6 +15,8 @@ use plotly::{
     },
 };
 
+use crate::UsageReportError;
+
 /// Génère un graphique unique avec une combobox pour sélectionner les règles.
 ///
 /// Cette fonction retourne une chaîne HTML contenant un div nommé par l'utilisateur,
@@ -38,7 +40,7 @@ pub fn plot_snakemake_rules(
     column: &str,
     title: &str,
     div_name: Option<&str>,
-) -> Result<String, polars::error::PolarsError> {
+) -> Result<String, UsageReportError> {
     let rule_names: Vec<String> = lf
         .clone()
         .collect()?
@@ -46,7 +48,12 @@ pub fn plot_snakemake_rules(
         .unique()?
         .sort(SortOptions::new().with_order_reversed())?
         .as_series()
-        .expect("Cannot get series from rule_name column")
+        .ok_or(UsageReportError::NoneValueError {
+            message: format!("Could not get a series for rule_name column"),
+            file: file!().into(),
+            line: line!(),
+            column: column!(),
+        })?
         .str()?
         .into_iter()
         .filter_map(|e| e.and_then(|e| Some(e.to_string())))
@@ -86,7 +93,12 @@ pub fn plot_snakemake_rules(
                 rule_data[column]
                     .cast(&DataType::Float32)?
                     .as_series()
-                    .expect("Cannot get series")
+                    .ok_or(UsageReportError::NoneValueError {
+                        message: format!("Could not get a series for rule_name column"),
+                        file: file!().into(),
+                        line: line!(),
+                        column: column!(),
+                    })?
                     .f32()?
                     .into_iter()
                     .collect(),

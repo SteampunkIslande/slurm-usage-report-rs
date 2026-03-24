@@ -17,6 +17,8 @@
 
 use polars::prelude::*;
 
+use crate::UsageReportError;
+
 /// Aggregates metrics per allocation (by JobRoot or specified group column).
 ///
 /// This function groups the LazyFrame by the specified column and aggregates
@@ -30,13 +32,15 @@ use polars::prelude::*;
 ///
 /// # Returns
 /// A new LazyFrame with aggregated metrics per group
-pub fn aggregate_per_alloc(mut lf: LazyFrame, group_col: &str) -> LazyFrame {
+pub fn aggregate_per_alloc(
+    mut lf: LazyFrame,
+    group_col: &str,
+) -> Result<LazyFrame, UsageReportError> {
     // Build aggregation expressions for common column types
     // We'll aggregate all columns that exist in the dataframe
     // If a column is a numeric type, aggregate using the highest value. Otherwise, just take the first non-null value.
     let aggs: Vec<Expr> = lf
-        .collect_schema()
-        .expect("Error collecting schema")
+        .collect_schema()?
         .iter_names_and_dtypes()
         .filter_map(|(name, dtype)| {
             if name.as_str() != group_col {
@@ -51,7 +55,8 @@ pub fn aggregate_per_alloc(mut lf: LazyFrame, group_col: &str) -> LazyFrame {
         })
         .collect();
 
-    lf.group_by([col(group_col)]).agg(aggs)
+    lf = lf.group_by([col(group_col)]).agg(aggs);
+    Ok(lf)
 }
 
 /// Aggregates metrics per Snakemake rule.

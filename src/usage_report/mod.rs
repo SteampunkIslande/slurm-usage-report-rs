@@ -9,6 +9,8 @@ pub use conversions::*;
 
 use polars::prelude::*;
 
+use crate::UsageReportError;
+
 /// Generates a LazyFrame with the most interesting columns to get a general idea of resource consumption, especially memory.
 ///
 /// This function should be called from a function that has taken one or more Parquet files as input.
@@ -29,7 +31,7 @@ use polars::prelude::*;
 /// 5. Calculates memory efficiency ratio and percentage
 /// 6. Parses TotalCPU column to seconds
 /// 7. Calculates CPU efficiency percentage
-pub fn generic_report(mut lf: LazyFrame) -> LazyFrame {
+pub fn generic_report(mut lf: LazyFrame) -> Result<LazyFrame, UsageReportError> {
     // Add JobRoot and JobInfoType columns (useful for the rest)
     lf = add_slurm_jobinfo_type_columns(lf);
 
@@ -45,7 +47,7 @@ pub fn generic_report(mut lf: LazyFrame) -> LazyFrame {
 
     // Note: all aggregated fields will only be aggregated if they are numeric
     // Aggregate metrics per allocation (by JobRoot)
-    lf = aggregate_per_alloc(lf, "JobRoot");
+    lf = aggregate_per_alloc(lf, "JobRoot")?;
 
     // Calculate memory efficiency ratio: MaxRSS / ReqMem
     lf = lf.with_columns([(col("MaxRSS").cast(DataType::Float64)
@@ -65,5 +67,5 @@ pub fn generic_report(mut lf: LazyFrame) -> LazyFrame {
         * lit(100.0))
     .alias("CPUEfficiencyPercent")]);
 
-    lf
+    Ok(lf)
 }

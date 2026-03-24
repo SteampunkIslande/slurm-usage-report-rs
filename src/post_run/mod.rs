@@ -30,7 +30,7 @@ pub fn generate_snakemake_efficiency_report(
     let args = ScanArgsParquet::default();
     let mut lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet)?, args)?;
 
-    lf = generic_report(lf);
+    lf = generic_report(lf)?;
     // Filter by job name, only after the aggregate is done
     for job_name in job_names {
         lf = lf.filter(
@@ -127,7 +127,7 @@ pub fn generate_snakemake_efficiency_report(
                 col("MemEfficiencyPercent_max").alias("Efficacité mémoire maximum"),
             ])
             .collect()?),
-    );
+    )?;
     let efficiency_table_cpu = utils::df_to_columnar_json(
         &(lf.clone()
             .select(&[
@@ -148,7 +148,7 @@ pub fn generate_snakemake_efficiency_report(
                 col("CPUEfficiencyPercent_max").alias("Efficacité CPU maximum"),
             ])
             .collect()?),
-    );
+    )?;
     let efficiency_table_runtime = utils::df_to_columnar_json(
         &(lf.clone()
             .select(&[
@@ -169,7 +169,7 @@ pub fn generate_snakemake_efficiency_report(
                 col("ElapsedRaw_max").alias("Durée maximum"),
             ])
             .collect()?),
-    );
+    )?;
     let efficiency_table_relative_mem = if input_sizes_csv.is_some() {
         Some(utils::df_to_columnar_json(
             &(lf.clone()
@@ -191,7 +191,7 @@ pub fn generate_snakemake_efficiency_report(
                     col("UsedRAMPerMo_max").alias("RAM utilisée par Mo (maximum)"),
                 ])
                 .collect()?),
-        ))
+        )?)
     } else {
         None
     };
@@ -216,13 +216,13 @@ pub fn generate_snakemake_efficiency_report(
                     col("MinPerMo_max").alias("Minutes par Mo (maximum)"),
                 ])
                 .collect()?),
-        ))
+        )?)
     } else {
         None
     };
     let template = JINJA_ENV
         .get_template("snakemake_report_template.html.j2")
-        .expect("Template cannot be found");
+        .expect("Template cannot be found (for a test, this is bad)");
     let output = template.render(json! (
         {
             "mem_box_plot": mem_box_plot,

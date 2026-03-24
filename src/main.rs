@@ -1,18 +1,20 @@
 pub mod cli;
 use clap::Parser;
 use cli::*;
+use slurm_usage_report_rs::UsageReportError;
 
-fn main() {
+fn main() -> Result<(), UsageReportError> {
     let cli = Cli::parse();
     match &cli.command {
         Commands::PostRunCmd(post_run_command) => {
-            post_run_command.run(&cli);
+            post_run_command.run(&cli)?;
         }
         Commands::Autocomplete(auto_complete) => {
             auto_complete.run(&cli);
         }
         Commands::CsvToParquet(csv_to_parquet) => {
-            csv_to_parquet.run(&cli);
+            csv_to_parquet.run(&cli)?;
         }
     }
+    Ok(())
 }

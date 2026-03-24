@@ -14,11 +14,13 @@
 //! 2. Convert units using functions in conversions module
 //! 3. Aggregate using functions in aggregates module
 
-use std::{io, path::Path};
+use std::path::Path;
 
 use duckdb::Connection;
 use in_place_macro::auto_rename;
 use polars::prelude::*;
+
+use crate::UsageReportError;
 
 /// Adds JobRoot and JobInfoType columns based on JobID.
 ///
@@ -523,9 +525,8 @@ pub fn add_metrics_relative_to_input_size(
     input_parquet: &Path,
     input_sizes: &Path,
     output_parquet: &Path,
-) -> io::Result<()> {
-    let conn: Connection =
-        duckdb::Connection::open_in_memory().expect("Cannot initialize duckdb connection");
+) -> Result<(), UsageReportError> {
+    let conn: Connection = duckdb::Connection::open_in_memory()?;
     let query = format!(
         r#"
         COPY (
@@ -543,8 +544,7 @@ pub fn add_metrics_relative_to_input_size(
         output_parquet.display()
     );
 
-    conn.execute(&query, [])
-        .expect("Erreur lors de l'édition du fichier parquet");
+    conn.execute(&query, [])?;
 }
 
 #[cfg(test)]
