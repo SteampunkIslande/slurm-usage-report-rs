@@ -1,7 +1,8 @@
 use clap::Parser;
-use slurm_usage_report_rs::{sacct_get, snakemake_parse_log, utils};
+use slurm_usage_report_rs::{UsageReportError, sacct_get, snakemake_parse_log, utils};
 use std::{
     collections::HashSet,
+    io::ErrorKind,
     path::{Path, PathBuf},
 };
 
@@ -47,17 +48,15 @@ pub struct PostRunCmd {
 }
 
 impl PostRunCmd {
-    pub fn run(&self, cli: &Cli) {
+    pub fn run(&self, cli: &Cli) -> Result<(), UsageReportError> {
         let slurm_job_names = snakemake_parse_log::get_slurm_ids(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
-        )
-        .expect("Error reading log files:");
+        )?;
 
         snakemake_parse_log::parse_snakemake_log_files(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
             &Path::new("input_sizes.csv"),
-        )
-        .expect("Error trying to get input sizes");
+        )?;
 
         let temp_sacct_csv = if self.db.is_none() {
             Some(Path::new("sacct.csv"))
@@ -69,8 +68,16 @@ impl PostRunCmd {
         // Raw parquet files that will be used to analyze slurm usage for snakemake runs given as input
         match &self.db {
             Some(db) => {
-                if !db.exists() || !db.is_dir() {
-                    panic!("{} should be an existing directory!", db.display());
+                if !db.is_dir() {
+                    return Err(UsageReportError::IOError(std::io::Error::new(
+                        ErrorKind::NotADirectory,
+                        format!("{} is not a directory!", db.display()),
+                    )));
+                } else if !db.exists() {
+                    return Err(UsageReportError::IOError(std::io::Error::new(
+                        ErrorKind::NotFound,
+                        format!("{} does not exist!", db.display()),
+                    )));
                 } else {
                     let mut dates: HashSet<String> = HashSet::new();
                     for path in &self.input {
@@ -87,7 +94,7 @@ impl PostRunCmd {
                             .map(|p| p.as_path())
                             .collect::<Vec<_>>(),
                         &temp_sacct_parquet,
-                    );
+                    )?;
                 }
             }
             None => {
@@ -96,7 +103,12 @@ impl PostRunCmd {
                         .iter()
                         .map(|s| s.as_str())
                         .collect::<Vec<_>>(),
-                    temp_sacct_csv.expect("Logical error"),
+                    temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
+                        message: "Logical error".into(),
+                        file: file!().into(),
+                        line: line!(),
+                        column: column!(),
+                    })?,
                 )
                 .expect("Error trying to get sacct info");
                 let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)
@@ -118,5 +130,6 @@ impl PostRunCmd {
             self.output_parquet.as_deref(),
             Some(Path::new("input_sizes.csv")),
         );
+        Ok(())
     }
 }

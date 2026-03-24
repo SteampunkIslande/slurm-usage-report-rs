@@ -1,7 +1,9 @@
+pub mod error;
 pub mod post_run;
 pub mod usage_report;
 pub mod utils;
 
+pub use error::*;
 pub use post_run::*;
 pub use usage_report::*;
 pub use utils::*;

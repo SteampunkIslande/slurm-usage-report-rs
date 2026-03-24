@@ -11,8 +11,8 @@ pub use sacct_get::*;
 use std::{fs::OpenOptions, path::Path};
 
 use crate::{
-    JINJA_ENV, add_metrics_relative_to_input_size, add_snakerule_col, aggregate_per_snakemake_rule,
-    generic_report, utils,
+    JINJA_ENV, UsageReportError, add_metrics_relative_to_input_size, add_snakerule_col,
+    aggregate_per_snakemake_rule, generic_report, utils,
 };
 
 pub fn generate_snakemake_efficiency_report(
@@ -21,18 +21,14 @@ pub fn generate_snakemake_efficiency_report(
     job_names: &[&str],
     output_parquet: Option<&Path>,
     input_sizes_csv: Option<&Path>,
-) {
+) -> Result<(), UsageReportError> {
     use crate::utils::sink_parquet;
     use polars::prelude::*;
     use serde_json::json;
     use std::io::Write;
 
     let args = ScanArgsParquet::default();
-    let mut lf = LazyFrame::scan_parquet(
-        PlRefPath::try_from_path(input_parquet).expect("Mince alors"),
-        args,
-    )
-    .expect("Impossible de charger le fichier parquet d'entrée");
+    let mut lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet)?, args)?;
 
     lf = generic_report(lf);
     // Filter by job name, only after the aggregate is done
@@ -48,10 +44,7 @@ pub fn generate_snakemake_efficiency_report(
     if let Some(input_sizes) = input_sizes_csv {
         // Sauvegarder le parquet en cours de lecture par le lazyframe, car on s'apprête à écrire dedans
         let parquet_temp = input_parquet.with_extension("tmp.parquet");
-        sink_parquet(lf, &parquet_temp).expect(&format!(
-            "Impossible d'écrire dans {}",
-            parquet_temp.display()
-        ));
+        sink_parquet(lf, &parquet_temp)?;
 
         // Cette fonction est `in-place`, c'est à dire qu'elle est conçue pour prendre le même chemin en entrée et en sortie
         // En l'occurence, le fichier temporaire que l'on vient de créer
@@ -59,18 +52,16 @@ pub fn generate_snakemake_efficiency_report(
             parquet_temp.as_path(),
             input_sizes,
             parquet_temp.as_path(),
-        )
-        .expect("Impossible d'ajouter les metrics relatives aux fichiers d'entrée");
+        )?;
 
         // Plus besoin du fichier temporaire, on remplace input_parquet par le fichier enrichi
-        std::fs::rename(parquet_temp, input_parquet).expect("Impossible de renommer");
+        std::fs::rename(parquet_temp, input_parquet)?;
 
         // input_parquet a été enrichi, on le réouvre sous forme de Layframe pour continuer l'extraction des données
         lf = LazyFrame::scan_parquet(
-            PlRefPath::try_from_path(input_parquet).expect("Impossible de convertir un chemin"),
+            PlRefPath::try_from_path(input_parquet)?,
             ScanArgsParquet::default(),
-        )
-        .expect("Problème à l'étape d'enrichissement avec input-sizes.csv");
+        )?;
     }
 
     let mem_box_plot = plot_snakemake_rules(
@@ -78,48 +69,39 @@ pub fn generate_snakemake_efficiency_report(
         "MemEfficiencyPercent",
         "Efficacité mémoire (en %)",
         Some("memef_percent"),
-    )
-    .expect("Cannot plot memory efficiency for rules!");
+    )?;
 
     let cpu_box_plot = plot_snakemake_rules(
         &lf,
         "CPUEfficiencyPercent",
         "Taux d'utilisation des CPUs",
         Some("cpuef_percent"),
-    )
-    .expect("Cannot plot CPU efficiency for rules");
+    )?;
 
     let runtime_box_plot = plot_snakemake_rules(
         &lf,
         "ElapsedRaw",
         "Durée d'exécution (en secondes)",
         Some("runtime_seconds"),
-    )
-    .expect("Cannot plot ElapsedRaw for rules");
+    )?;
 
     let relative_mem_box_plot = if input_sizes_csv.is_some() {
-        Some(
-            plot_snakemake_rules(
-                &lf,
-                "UsedRAMPerMo",
-                "Quantité de RAM utilisée (en Mo) par Mo de fichier(s) d'entrée",
-                Some("relative_ram_per_inputmo"),
-            )
-            .expect("Cannot plot relative memory usage for rules"),
-        )
+        Some(plot_snakemake_rules(
+            &lf,
+            "UsedRAMPerMo",
+            "Quantité de RAM utilisée (en Mo) par Mo de fichier(s) d'entrée",
+            Some("relative_ram_per_inputmo"),
+        )?)
     } else {
         None
     };
     let relative_runtime_box_plot = if input_sizes_csv.is_some() {
-        Some(
-            plot_snakemake_rules(
-                &lf,
-                "MinPerMo",
-                "Durée d'exécution (en minutes) par Mo de fichier(s) d'entrée",
-                Some("min_per_input_mo"),
-            )
-            .expect("Cannot plot relative runtime for rules"),
-        )
+        Some(plot_snakemake_rules(
+            &lf,
+            "MinPerMo",
+            "Durée d'exécution (en minutes) par Mo de fichier(s) d'entrée",
+            Some("min_per_input_mo"),
+        )?)
     } else {
         None
     };
@@ -144,8 +126,7 @@ pub fn generate_snakemake_efficiency_report(
                 col("MemEfficiencyPercent_min").alias("Efficacité mémoire minimum"),
                 col("MemEfficiencyPercent_max").alias("Efficacité mémoire maximum"),
             ])
-            .collect()
-            .expect("Cannot collect")),
+            .collect()?),
     );
     let efficiency_table_cpu = utils::df_to_columnar_json(
         &(lf.clone()
@@ -166,8 +147,7 @@ pub fn generate_snakemake_efficiency_report(
                 col("CPUEfficiencyPercent_min").alias("Efficacité CPU minimum"),
                 col("CPUEfficiencyPercent_max").alias("Efficacité CPU maximum"),
             ])
-            .collect()
-            .expect("Cannot collect")),
+            .collect()?),
     );
     let efficiency_table_runtime = utils::df_to_columnar_json(
         &(lf.clone()
@@ -188,8 +168,7 @@ pub fn generate_snakemake_efficiency_report(
                 col("ElapsedRaw_min").alias("Durée minimum"),
                 col("ElapsedRaw_max").alias("Durée maximum"),
             ])
-            .collect()
-            .expect("Yash")),
+            .collect()?),
     );
     let efficiency_table_relative_mem = if input_sizes_csv.is_some() {
         Some(utils::df_to_columnar_json(
@@ -211,8 +190,7 @@ pub fn generate_snakemake_efficiency_report(
                     col("UsedRAMPerMo_min").alias("RAM utilisée par Mo (minimum)"),
                     col("UsedRAMPerMo_max").alias("RAM utilisée par Mo (maximum)"),
                 ])
-                .collect()
-                .expect("Cannot collect")),
+                .collect()?),
         ))
     } else {
         None
@@ -237,8 +215,7 @@ pub fn generate_snakemake_efficiency_report(
                     col("MinPerMo_min").alias("Minutes par Mo (minimum)"),
                     col("MinPerMo_max").alias("Minutes par Mo (maximum)"),
                 ])
-                .collect()
-                .expect("Cannot collect")),
+                .collect()?),
         ))
     } else {
         None
@@ -246,8 +223,7 @@ pub fn generate_snakemake_efficiency_report(
     let template = JINJA_ENV
         .get_template("snakemake_report_template.html.j2")
         .expect("Template cannot be found");
-    let output = template
-        .render(json! (
+    let output = template.render(json! (
         {
             "mem_box_plot": mem_box_plot,
             "cpu_box_plot": cpu_box_plot,
@@ -259,16 +235,17 @@ pub fn generate_snakemake_efficiency_report(
             "efficiency_table_runtime": efficiency_table_runtime,
             "efficiency_table_relative_mem": efficiency_table_relative_mem,
             "efficiency_table_relative_runtime": efficiency_table_relative_runtime,
-        }))
-        .expect("Jinja render error!");
+        }
+    ))?;
     let mut f = OpenOptions::new()
         .create_new(true)
         .write(true)
-        .open(output_html)
-        .expect("Cannot open file to write");
-    write!(f, "{}", output).expect("Cannot write report!");
+        .open(output_html)?;
+    write!(f, "{}", output)?;
 
     if let Some(output_parquet) = output_parquet {
-        utils::sink_parquet(lf.clone(), output_parquet).expect("Cannot write parquet");
+        utils::sink_parquet(lf.clone(), output_parquet)?;
     }
+
+    Ok(())
 }

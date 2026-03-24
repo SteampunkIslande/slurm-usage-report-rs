@@ -6,8 +6,10 @@
 use in_place::InPlace;
 use polars::prelude::*;
 use serde_json::{Value, json};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
+
+use crate::UsageReportError;
 
 /// All available columns from sacct output
 pub const ALL_COLUMNS: &[&str] = &[
@@ -302,7 +304,10 @@ pub fn sacct_sanitizer(
 /// # Returns
 /// * `Ok(())` on success
 /// * `Err(Box<dyn std::error::Error>)` on failure
-pub fn csv_to_parquet<P: AsRef<Path>>(input_csv: P, output_parquet: P) -> io::Result<()> {
+pub fn csv_to_parquet<P: AsRef<Path>>(
+    input_csv: P,
+    output_parquet: P,
+) -> Result<(), UsageReportError> {
     // Define the schema for the SLURM sacct output
     let schema = Schema::from_iter(vec![
         Field::new(PlSmallStr::from_str("Account"), DataType::String),
@@ -428,41 +433,34 @@ pub fn csv_to_parquet<P: AsRef<Path>>(input_csv: P, output_parquet: P) -> io::Re
         Field::new(PlSmallStr::from_str("WorkDir"), DataType::String),
     ]);
 
-    let lf =
-        LazyCsvReader::new(PlRefPath::try_from_path(input_csv.as_ref()).expect("Cannot read file"))
-            .with_schema(Some(Arc::new(schema)))
-            .with_separator(b'|')
-            .with_quote_char(None)
-            .finish()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let lf = LazyCsvReader::new(PlRefPath::try_from_path(input_csv.as_ref())?)
+        .with_schema(Some(Arc::new(schema)))
+        .with_separator(b'|')
+        .with_quote_char(None)
+        .finish()?;
 
     sink_parquet(lf, output_parquet.as_ref())?;
 
     Ok(())
 }
 
-pub fn sink_parquet(lf: LazyFrame, path: &Path) -> io::Result<()> {
+pub fn sink_parquet(lf: LazyFrame, path: &Path) -> Result<(), UsageReportError> {
     let _ = lf
         .sink(
             SinkDestination::File {
-                target: SinkTarget::Path(
-                    PlRefPath::try_from_path(path).expect("Cannot get Path from Path"),
-                ),
+                target: SinkTarget::Path(PlRefPath::try_from_path(path)?),
             },
             FileWriteFormat::Parquet(Arc::new(ParquetWriteOptions::default())),
             UnifiedSinkArgs::default(),
-        )
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
-        .collect()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        )?
+        .collect()?;
     Ok(())
 }
 
-pub fn merge_parquets(inputs: &[&Path], output: &Path) {
+pub fn merge_parquets(inputs: &[&Path], output: &Path) -> Result<(), UsageReportError> {
     use duckdb::Connection;
 
-    let conn: Connection =
-        duckdb::Connection::open_in_memory().expect("Cannot initialize duckdb connection");
+    let conn: Connection = duckdb::Connection::open_in_memory()?;
     let query = format!(
         r#"
         COPY (
@@ -480,8 +478,8 @@ pub fn merge_parquets(inputs: &[&Path], output: &Path) {
         output = output.display()
     );
 
-    conn.execute(&query, [])
-        .expect("Impossible de fusionner les fichiers parquet");
+    conn.execute(&query, [])?;
+    Ok(())
 }
 
 fn anyvalue_to_json(v: AnyValue) -> Value {
@@ -515,7 +513,7 @@ fn anyvalue_to_json(v: AnyValue) -> Value {
     }
 }
 
-pub fn df_to_columnar_json(df: &DataFrame) -> Value {
+pub fn df_to_columnar_json(df: &DataFrame) -> Result<Value, UsageReportError> {
     let mut map = serde_json::Map::new();
 
     for col in df.columns() {
@@ -523,7 +521,12 @@ pub fn df_to_columnar_json(df: &DataFrame) -> Value {
 
         let values: Vec<Value> = col
             .as_series()
-            .expect("Cannot get series")
+            .ok_or(UsageReportError::NoneValueError {
+                message: "Cannot get series".into(),
+                file: file!().to_string(),
+                line: line!(),
+                column: column!(),
+            })?
             .iter()
             .map(anyvalue_to_json)
             .collect();
@@ -531,7 +534,7 @@ pub fn df_to_columnar_json(df: &DataFrame) -> Value {
         map.insert(name, Value::Array(values));
     }
 
-    Value::Object(map)
+    Ok(Value::Object(map))
 }
 
 #[cfg(test)]
@@ -546,7 +549,7 @@ mod tests {
             "b" => vec![Some("a"), None, Some("c"), Some("d")]
         )
         .unwrap();
-        let v = df_to_columnar_json(&df);
+        let v = df_to_columnar_json(&df).unwrap();
         assert_eq!(
             v,
             json!({
