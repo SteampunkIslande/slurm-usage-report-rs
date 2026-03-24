@@ -458,21 +458,22 @@ pub fn merge_parquets(inputs: &[&Path], output: &Path) -> Result<(), UsageReport
     use duckdb::Connection;
 
     let conn: Connection = duckdb::Connection::open_in_memory()?;
+    let parquet_list = inputs
+        .iter()
+        .map(|p| format!("'{}'", p.display()))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let parquet_array = format!("[{}]", parquet_list);
+
+    let output_path = output.display();
+
     let query = format!(
         r#"
-        COPY (
-            SELECT * FROM read_parquet({input_parquets},union_by_name=true)
-        ) TO '{output}'
-        "#,
-        input_parquets = format!(
-            "[{}]",
-            inputs
-                .iter()
-                .map(|p| format!("'{}'", p.display()))
-                .collect::<Vec<String>>()
-                .join(",")
-        ),
-        output = output.display()
+    COPY (
+        SELECT * FROM read_parquet({parquet_array}, union_by_name=true)
+    ) TO '{output_path}'
+    "#
     );
 
     conn.execute(&query, [])?;
