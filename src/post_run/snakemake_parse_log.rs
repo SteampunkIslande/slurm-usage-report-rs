@@ -247,8 +247,7 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
     Ok(log_paths
         .iter()
         .map(|p| {
-            File::open(p).map(BufReader::new).and_then(|f| {
-                Ok(f.lines()
+            File::open(p).map(BufReader::new).map(|f| f.lines()
                     .filter_map(|s| match s {
                         Ok(s) => {
                             if s.contains("SLURM run ID: ") {
@@ -260,10 +259,9 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
                         Err(_) => None,
                     })
                     .next())
-            })
         })
         .filter_map(|s| s.ok())
-        .filter_map(|s| s)
+        .flatten()
         .collect())
 }
 
@@ -292,8 +290,8 @@ pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
         let line = line.unwrap_or("".to_string());
 
         // Cherche un pattern entre crochets
-        if let Some(start) = line.find('[') {
-            if let Some(end) = line.find(']') {
+        if let Some(start) = line.find('[')
+            && let Some(end) = line.find(']') {
                 let raw = &line[start + 1..end];
 
                 // Exemple: "Thu Mar  5 11:45:18 2026"
@@ -301,7 +299,6 @@ pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
                     dates.insert(dt.format("%Y-%m-%d").to_string());
                 }
             }
-        }
     }
     dates
 }

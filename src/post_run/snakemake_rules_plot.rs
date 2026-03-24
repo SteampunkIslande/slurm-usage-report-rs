@@ -49,14 +49,14 @@ pub fn plot_snakemake_rules(
         .sort(SortOptions::new().with_order_reversed())?
         .as_series()
         .ok_or(UsageReportError::NoneValueError {
-            message: format!("Could not get a series for rule_name column"),
+            message: "Could not get a series for rule_name column".to_string(),
             file: file!().into(),
             line: line!(),
             column: column!(),
         })?
         .str()?
         .into_iter()
-        .filter_map(|e| e.and_then(|e| Some(e.to_string())))
+        .filter_map(|e| e.map(|e| e.to_string()))
         .collect();
 
     let mut buttons: Vec<Button> = Vec::new();
@@ -71,7 +71,7 @@ pub fn plot_snakemake_rules(
     let mut figure = plotly::Plot::new();
 
     for (i, rule_name) in rule_names.iter().enumerate() {
-        let mut visible: Vec<bool> = (&[false])
+        let mut visible: Vec<bool> = [false]
             .repeat(rule_names.len())
             .into_iter()
             .collect::<Vec<bool>>();
@@ -94,7 +94,7 @@ pub fn plot_snakemake_rules(
                     .cast(&DataType::Float32)?
                     .as_series()
                     .ok_or(UsageReportError::NoneValueError {
-                        message: format!("Could not get a series for rule_name column"),
+                        message: "Could not get a series for rule_name column".to_string(),
                         file: file!().into(),
                         line: line!(),
                         column: column!(),
@@ -102,7 +102,7 @@ pub fn plot_snakemake_rules(
                     .f32()?
                     .into_iter()
                     .collect(),
-                (&[rule_name])
+                [rule_name]
                     .repeat(rule_data.shape().0)
                     .iter()
                     .map(|s| s.to_string())

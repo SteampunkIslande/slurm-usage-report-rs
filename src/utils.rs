@@ -228,7 +228,7 @@ pub const INTERESTING_COLUMNS: &[&str] = &[
 
 pub fn get_color(v: minijinja::Value, col_name: &str) -> Option<String> {
     if let Ok(value) = f32::try_from(v) {
-        let c_map = vec![
+        let c_map = [
             ((0, 20), "#ff0000"),
             ((21, 60), "#d4a500"),
             ((61, 75), "#ffa500"),
@@ -236,7 +236,7 @@ pub fn get_color(v: minijinja::Value, col_name: &str) -> Option<String> {
             ((101, 125), "#ffa500"),
             ((126, 150), "#ff0000"),
         ];
-        let colored_cols = vec![
+        let colored_cols = [
             "Efficacité mémoire moyenne",
             "Efficacité mémoire médiane",
             "Efficacité mémoire minimum",
@@ -274,11 +274,9 @@ pub fn sacct_sanitizer(
     file_name: &Path,
     col_count: Option<u32>,
     separator: Option<&str>,
-) -> std::io::Result<usize> {
+) -> Result<usize, UsageReportError> {
     let mut removed_lines = 0usize;
-    let inp = InPlace::new(file_name)
-        .open()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let inp = InPlace::new(file_name).open()?;
 
     let reader = BufReader::new(inp.reader());
     let mut writer = inp.writer();
@@ -290,8 +288,7 @@ pub fn sacct_sanitizer(
             writeln!(writer, "{line}")?;
         }
     }
-    inp.save()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    inp.save()?;
     Ok(removed_lines)
 }
 

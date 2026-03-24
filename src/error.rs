@@ -19,4 +19,6 @@ pub enum UsageReportError {
     ExternalProcessError { cmd: String },
     #[error(transparent)]
     JinjaError(#[from] minijinja::Error),
+    #[error(transparent)]
+    InPlaceError(#[from] in_place::InPlaceError),
 }

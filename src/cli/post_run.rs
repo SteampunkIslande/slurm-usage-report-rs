@@ -8,7 +8,7 @@ use std::{
 
 use crate::cli::Cli;
 
-const LONG_ABOUT: &'static str = concat!(
+const LONG_ABOUT: &str = concat!(
     "Script post-run pour générer un rapport d'usage Slurm à partir des logs de Snakemake.\n\n",
     "Possibilité de spécifier plusieurs fichiers de log (ex: .snakemake/log/xxx.log) pour consolider les métriques\n",
     "à partir de plusieurs runs de Snakemake mais avec le même pipeline."
@@ -55,7 +55,7 @@ impl PostRunCmd {
 
         snakemake_parse_log::parse_snakemake_log_files(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
-            &Path::new("input_sizes.csv"),
+            Path::new("input_sizes.csv"),
         )?;
 
         let temp_sacct_csv = if self.db.is_none() {
@@ -110,7 +110,7 @@ impl PostRunCmd {
                         column: column!(),
                     })?,
                 )?;
-                let removed_lines = utils::sacct_sanitizer(&Path::new("sacct.csv"), None, None)?;
+                let removed_lines = utils::sacct_sanitizer(Path::new("sacct.csv"), None, None)?;
                 if cli.verbose {
                     eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
