@@ -248,6 +248,47 @@ pub fn get_color_map(name: &str) -> Vec<ColorMapEntry> {
     }
 }
 
+pub fn get_color(value: f32, col_name: &str) -> Option<String> {
+    let c_map = vec![
+        ((0, 20), "#ff0000"),
+        ((21, 60), "#d4a500"),
+        ((61, 75), "#ffa500"),
+        ((76, 100), "#008000"),
+        ((101, 125), "#ffa500"),
+        ((126, 150), "#ff0000"),
+    ];
+    let colored_cols = vec![
+        "Efficacité mémoire moyenne",
+        "Efficacité mémoire médiane",
+        "Efficacité mémoire minimum",
+        "Efficacité mémoire maximum",
+        "Efficacité CPU moyenne",
+        "Efficacité CPU médiane",
+        "Efficacité CPU minimum",
+        "Efficacité CPU maximum",
+    ];
+    // No special color for non numbers
+    if !colored_cols.contains(&col_name) {
+        return None;
+    } else {
+        if value < (c_map[0].0.0 as f32) {
+            return Some(c_map[0].1.to_string());
+        }
+        if let Some(last) = c_map.last() {
+            if value > (last.0.1 as f32) {
+                return Some(last.1.to_string());
+            } else {
+                for ((lower_bound, upper_bound), color) in c_map.iter() {
+                    if value >= (*lower_bound as f32) && value <= (*upper_bound as f32) {
+                        return Some(color.to_string());
+                    }
+                }
+            }
+        }
+        return None;
+    }
+}
+
 pub fn sacct_sanitizer(
     file_name: &Path,
     col_count: Option<u32>,

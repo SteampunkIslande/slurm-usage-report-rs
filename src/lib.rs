@@ -17,6 +17,7 @@ fn format_header(s: &str) -> String {
 }
 
 pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
+    use utils::get_color;
     let mut environment: Environment = Environment::new();
     environment.set_loader(move |name| {
         if let Some(file) = TEMPLATES_DIR.get_file(name) {
@@ -30,5 +31,6 @@ pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
         }
     });
     environment.add_filter("format_header", format_header);
+    environment.add_filter("get_color", get_color);
     environment
 });

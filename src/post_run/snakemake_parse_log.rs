@@ -298,7 +298,7 @@ pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
 
                 // Exemple: "Thu Mar  5 11:45:18 2026"
                 if let Ok(dt) = NaiveDateTime::parse_from_str(raw, "%a %b %e %H:%M:%S %Y") {
-                    dates.insert(dt.format("%Y-%m-%D").to_string());
+                    dates.insert(dt.format("%Y-%m-%d").to_string());
                 }
             }
         }

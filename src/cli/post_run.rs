@@ -76,6 +76,7 @@ impl PostRunCmd {
                     for path in &self.input {
                         dates.extend(snakemake_parse_log::get_snakemake_run_span(path.as_path()));
                     }
+                    eprintln!("{:?}", dates);
                     let input_parquets: Vec<PathBuf> = dates
                         .into_iter()
                         .map(|p| db.join(p).with_added_extension("parquet"))
