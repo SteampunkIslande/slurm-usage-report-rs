@@ -247,7 +247,8 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
     Ok(log_paths
         .iter()
         .map(|p| {
-            File::open(p).map(BufReader::new).map(|f| f.lines()
+            File::open(p).map(BufReader::new).map(|f| {
+                f.lines()
                     .filter_map(|s| match s {
                         Ok(s) => {
                             if s.contains("SLURM run ID: ") {
@@ -258,7 +259,8 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
                         }
                         Err(_) => None,
                     })
-                    .next())
+                    .next()
+            })
         })
         .filter_map(|s| s.ok())
         .flatten()
@@ -274,7 +276,7 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
 /// # Returns
 ///
 /// - `Vec<String>` - All the dates from the beginning of the snakemake run to the end,
-/// using format `YY-mm-DD`
+///   using format `YY-mm-DD`
 pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
     let file = File::open(log_path);
     let file = match file {
@@ -291,14 +293,15 @@ pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
 
         // Cherche un pattern entre crochets
         if let Some(start) = line.find('[')
-            && let Some(end) = line.find(']') {
-                let raw = &line[start + 1..end];
+            && let Some(end) = line.find(']')
+        {
+            let raw = &line[start + 1..end];
 
-                // Exemple: "Thu Mar  5 11:45:18 2026"
-                if let Ok(dt) = NaiveDateTime::parse_from_str(raw, "%a %b %e %H:%M:%S %Y") {
-                    dates.insert(dt.format("%Y-%m-%d").to_string());
-                }
+            // Exemple: "Thu Mar  5 11:45:18 2026"
+            if let Ok(dt) = NaiveDateTime::parse_from_str(raw, "%a %b %e %H:%M:%S %Y") {
+                dates.insert(dt.format("%Y-%m-%d").to_string());
             }
+        }
     }
     dates
 }

@@ -28,6 +28,7 @@ impl AutoComplete {
             .create(true)
             .create_new(!self.force)
             .write(true)
+            .truncate(self.force)
             .open(&self.output)
         {
             Ok(mut complete_file) => {

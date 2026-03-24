@@ -65,7 +65,7 @@ pub fn plot_snakemake_rules(
             .label("ALL")
             .method(ButtonMethod::Restyle)
             .args(serde_json::json!([
-                {"visible": (&[true]).repeat(rule_names.len()).into_iter().collect::<Vec<bool>>()}
+                {"visible": ([true]).repeat(rule_names.len()).into_iter().collect::<Vec<bool>>()}
             ])),
     );
     let mut figure = plotly::Plot::new();
