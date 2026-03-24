@@ -224,69 +224,48 @@ pub const INTERESTING_COLUMNS: &[&str] = &[
     "WorkDir",
 ];
 
-/// Default color map for duration visualization
-/// Each entry is ((min_hours, max_hours), color_hex)
-pub type ColorMapEntry = ((i32, i32), &'static str);
-
-/// Get the default color map
-pub fn get_default_cmap() -> Vec<ColorMapEntry> {
-    vec![
-        ((0, 20), "#ff0000"),
-        ((21, 60), "#d4a500"),
-        ((61, 75), "#ffa500"),
-        ((76, 100), "#008000"),
-        ((101, 125), "#ffa500"),
-        ((126, 150), "#ff0000"),
-    ]
-}
-
-/// Get a color map by name
-pub fn get_color_map(name: &str) -> Vec<ColorMapEntry> {
-    match name {
-        "default" => get_default_cmap(),
-        _ => get_default_cmap(),
-    }
-}
-
-pub fn get_color(value: f32, col_name: &str) -> Option<String> {
-    let c_map = vec![
-        ((0, 20), "#ff0000"),
-        ((21, 60), "#d4a500"),
-        ((61, 75), "#ffa500"),
-        ((76, 100), "#008000"),
-        ((101, 125), "#ffa500"),
-        ((126, 150), "#ff0000"),
-    ];
-    let colored_cols = vec![
-        "Efficacité mémoire moyenne",
-        "Efficacité mémoire médiane",
-        "Efficacité mémoire minimum",
-        "Efficacité mémoire maximum",
-        "Efficacité CPU moyenne",
-        "Efficacité CPU médiane",
-        "Efficacité CPU minimum",
-        "Efficacité CPU maximum",
-    ];
-    // No special color for non numbers
-    if !colored_cols.contains(&col_name) {
-        return None;
-    } else {
-        if value < (c_map[0].0.0 as f32) {
-            return Some(c_map[0].1.to_string());
-        }
-        if let Some(last) = c_map.last() {
-            if value > (last.0.1 as f32) {
-                return Some(last.1.to_string());
-            } else {
-                for ((lower_bound, upper_bound), color) in c_map.iter() {
-                    if value >= (*lower_bound as f32) && value <= (*upper_bound as f32) {
-                        return Some(color.to_string());
+pub fn get_color(v: minijinja::Value, col_name: &str) -> Option<String> {
+    if let Ok(value) = f32::try_from(v) {
+        let c_map = vec![
+            ((0, 20), "#ff0000"),
+            ((21, 60), "#d4a500"),
+            ((61, 75), "#ffa500"),
+            ((76, 100), "#008000"),
+            ((101, 125), "#ffa500"),
+            ((126, 150), "#ff0000"),
+        ];
+        let colored_cols = vec![
+            "Efficacité mémoire moyenne",
+            "Efficacité mémoire médiane",
+            "Efficacité mémoire minimum",
+            "Efficacité mémoire maximum",
+            "Efficacité CPU moyenne",
+            "Efficacité CPU médiane",
+            "Efficacité CPU minimum",
+            "Efficacité CPU maximum",
+        ];
+        // No special color for non numbers
+        if !colored_cols.contains(&col_name) {
+            return None;
+        } else {
+            if value < (c_map[0].0.0 as f32) {
+                return Some(c_map[0].1.to_string());
+            }
+            if let Some(last) = c_map.last() {
+                if value > (last.0.1 as f32) {
+                    return Some(last.1.to_string());
+                } else {
+                    for ((lower_bound, upper_bound), color) in c_map.iter() {
+                        if value >= (*lower_bound as f32) && value <= (*upper_bound as f32) {
+                            return Some(color.to_string());
+                        }
                     }
                 }
             }
+            return None;
         }
-        return None;
     }
+    None
 }
 
 pub fn sacct_sanitizer(
@@ -323,10 +302,7 @@ pub fn sacct_sanitizer(
 /// # Returns
 /// * `Ok(())` on success
 /// * `Err(Box<dyn std::error::Error>)` on failure
-pub fn csv_to_parquet<P: AsRef<Path>, Q: AsRef<Path>>(
-    input_csv: P,
-    output_parquet: Q,
-) -> io::Result<()> {
+pub fn csv_to_parquet<P: AsRef<Path>>(input_csv: P, output_parquet: P) -> io::Result<()> {
     // Define the schema for the SLURM sacct output
     let schema = Schema::from_iter(vec![
         Field::new(PlSmallStr::from_str("Account"), DataType::String),
@@ -556,4 +532,27 @@ pub fn df_to_columnar_json(df: &DataFrame) -> Value {
     }
 
     Value::Object(map)
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_df_to_columnar_json() {
+        let df = df!(
+            "a" => vec![1, 2, 3, 4],
+            "b" => vec![Some("a"), None, Some("c"), Some("d")]
+        )
+        .unwrap();
+        let v = df_to_columnar_json(&df);
+        assert_eq!(
+            v,
+            json!({
+                "a": [1, 2, 3, 4],
+                "b": ["a", Value::Null, "c", "d"]
+            })
+        )
+    }
 }

@@ -38,11 +38,15 @@ pub fn aggregate_per_alloc(mut lf: LazyFrame, group_col: &str) -> LazyFrame {
         .collect_schema()
         .expect("Error collecting schema")
         .iter_names_and_dtypes()
-        .map(|(name, dtype)| {
-            if dtype.is_numeric() {
-                col(name.clone()).max()
+        .filter_map(|(name, dtype)| {
+            if name.as_str() != group_col {
+                if dtype.is_numeric() {
+                    Some(col(name.clone()).max())
+                } else {
+                    Some(col(name.clone()).drop_nulls().first())
+                }
             } else {
-                col(name.clone()).drop_nulls().first()
+                None
             }
         })
         .collect();

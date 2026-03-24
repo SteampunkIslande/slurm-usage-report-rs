@@ -136,19 +136,19 @@
     <table>
       <thead>
         <tr>
-          {% for col in table_data.keys() %}
+          {% for col in table_data %}
           <th>{{ col | format_header | safe }}</th>
           {% endfor %}
         </tr>
       </thead>
       <tbody>
         {# Déterminer le nombre de lignes #}
-        {% set first_col = table_data.keys() | first %}
+        {% set first_col = table_data | first %}
         {% set num_rows = table_data[first_col] | length %}
 
         {% for row_idx in range(num_rows) %}
         <tr>
-          {% for col in table_data.keys() %}
+          {% for col in table_data %}
           <td>
             {% set cell_value = table_data[col][row_idx] %}
             {% set badge_color = cell_value | get_color(col) %}
