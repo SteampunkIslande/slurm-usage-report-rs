@@ -14,6 +14,8 @@ use std::io::{self, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use crate::UsageReportError;
+
 // ── Regex compilées une seule fois ──────────────────────────────────────────
 
 static RULE_RE: LazyLock<Regex> =
@@ -200,7 +202,7 @@ fn parse_snakemake_log_file(
     log_path: &Path,
     output_path: &Path,
     write_header: bool,
-) -> io::Result<()> {
+) -> Result<(), UsageReportError> {
     let original_dir = env::current_dir()?;
 
     if let Some(project_dir) = find_project_dir(log_path) {
@@ -236,7 +238,10 @@ fn parse_snakemake_log_file(
     Ok(())
 }
 
-pub fn parse_snakemake_log_files(log_paths: &[&Path], output_path: &Path) -> io::Result<()> {
+pub fn parse_snakemake_log_files(
+    log_paths: &[&Path],
+    output_path: &Path,
+) -> Result<(), UsageReportError> {
     for (i, log_path) in log_paths.iter().enumerate() {
         parse_snakemake_log_file(log_path, output_path, i == 0)?;
     }
@@ -405,7 +410,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_snakemake_log_file_integration() -> io::Result<()> {
+    fn test_parse_snakemake_log_file_integration() -> Result<(), UsageReportError> {
         use tempfile::tempdir;
 
         // Créer un répertoire temporaire pour simuler la structure du projet

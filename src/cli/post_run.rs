@@ -32,7 +32,7 @@ pub struct PostRunCmd {
     #[arg(long)]
     output_parquet: Option<PathBuf>,
 
-    /// Conserver tous les fichiers de sortie intermédiaires.
+    /// Conserver tous les fichiers de sortie intermédiaires, même en cas d'erreur.
     ///
     /// Concerne:
     /// - `sacct.parquet`: le résultat de la commande sacct pour les runs spécifiés (au format parquet) ou le parquet fusionné pour tous les jobs d'intérêt
@@ -56,11 +56,18 @@ impl PostRunCmd {
 
         let input_sizes_path = Path::new("input_sizes.csv");
 
-        snakemake_parse_log::parse_snakemake_log_files(
+        // Get input_sizes. If we fail, we remove them
+        if let Err(e) = snakemake_parse_log::parse_snakemake_log_files(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
             input_sizes_path,
-        )?;
+        ) {
+            if !self.keep_all_outputs && input_sizes_path.is_file() {
+                std::fs::remove_file(input_sizes_path)?;
+            }
+            return Err(e);
+        }
 
+        // Path to the temporary intermediary sacct.csv. Will only be kept if we cannot convert it to parquet
         let temp_sacct_csv = if self.db.is_none() {
             Some(Path::new("sacct.csv"))
         } else {
@@ -91,17 +98,36 @@ impl PostRunCmd {
                         .map(|p| db.join(p).with_added_extension("parquet"))
                         .filter(|p| p.exists())
                         .collect();
-                    utils::merge_parquets(
+                    if input_parquets.is_empty() {
+                        if !self.keep_all_outputs && input_sizes_path.is_file() {
+                            std::fs::remove_file(input_sizes_path)?;
+                        }
+                        return Err(UsageReportError::EmptyList {
+                            listname: "input_parquets".into(),
+                            message: "La liste des fichiers parquet pour l'analyse est vide. Impossible de continuer".into(),
+                        });
+                    }
+                    if let Err(e) = utils::merge_parquets(
                         &input_parquets
                             .iter()
                             .map(|p| p.as_path())
                             .collect::<Vec<_>>(),
                         &temp_sacct_parquet,
-                    )?;
+                    ) {
+                        if !self.keep_all_outputs {
+                            if input_sizes_path.is_file() {
+                                std::fs::remove_file(input_sizes_path)?
+                            };
+                            if temp_sacct_parquet.is_file() {
+                                std::fs::remove_file(temp_sacct_parquet)?
+                            };
+                        }
+                        return Err(e);
+                    }
                 }
             }
             None => {
-                sacct_get::get_sacct_for_runs(
+                if let Err(e) = sacct_get::get_sacct_for_runs(
                     &slurm_job_names
                         .iter()
                         .map(|s| s.as_str())
@@ -112,7 +138,19 @@ impl PostRunCmd {
                         line: line!(),
                         column: column!(),
                     })?,
-                )?;
+                ) {
+                    if !self.keep_all_outputs {
+                        if input_sizes_path.is_file() {
+                            std::fs::remove_file(input_sizes_path)?
+                        };
+                        if let Some(sacct_csv) = temp_sacct_csv
+                            && sacct_csv.is_file()
+                        {
+                            std::fs::remove_file(input_sizes_path)?
+                        };
+                    }
+                    return Err(e);
+                }
                 let removed_lines = utils::sacct_sanitizer(
                     temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
                         message: "Logical error".into(),
@@ -126,7 +164,7 @@ impl PostRunCmd {
                 if cli.verbose {
                     eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
-                utils::csv_to_parquet(
+                if let Err(e) = utils::csv_to_parquet(
                     temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
                         message: "Logical error".into(),
                         file: file!().into(),
@@ -134,12 +172,22 @@ impl PostRunCmd {
                         column: column!(),
                     })?,
                     temp_sacct_parquet.as_path(),
-                )?;
+                ) {
+                    if !self.keep_all_outputs {
+                        if input_sizes_path.is_file() {
+                            std::fs::remove_file(input_sizes_path)?
+                        };
+                        if temp_sacct_parquet.is_file() {
+                            std::fs::remove_file(temp_sacct_parquet.as_path())?
+                        };
+                    }
+                    return Err(e);
+                };
             }
         }
         use slurm_usage_report_rs::post_run::generate_snakemake_efficiency_report;
 
-        generate_snakemake_efficiency_report(
+        if let Err(e) = generate_snakemake_efficiency_report(
             &self.output_html,
             &temp_sacct_parquet,
             &slurm_job_names
@@ -148,7 +196,41 @@ impl PostRunCmd {
                 .collect::<Vec<_>>(),
             self.output_parquet.as_deref(),
             Some(input_sizes_path),
-        )?;
+        ) {
+            if !self.keep_all_outputs {
+                if input_sizes_path.is_file() {
+                    std::fs::remove_file(input_sizes_path)?
+                };
+                if temp_sacct_parquet.is_file() {
+                    std::fs::remove_file(temp_sacct_parquet.as_path())?
+                };
+                if self.output_html.is_file() {
+                    std::fs::remove_file(self.output_html.as_path())?
+                };
+                if let Some(ref output_parquet) = self.output_parquet
+                    && output_parquet.is_file()
+                {
+                    std::fs::remove_file(output_parquet.as_path())?
+                };
+            }
+            return Err(e);
+        }
+        if !self.keep_all_outputs {
+            if input_sizes_path.is_file() {
+                std::fs::remove_file(input_sizes_path)?
+            };
+            if temp_sacct_parquet.is_file() {
+                std::fs::remove_file(temp_sacct_parquet.as_path())?
+            };
+            if self.output_html.is_file() {
+                std::fs::remove_file(self.output_html.as_path())?
+            };
+            if let Some(ref output_parquet) = self.output_parquet
+                && output_parquet.is_file()
+            {
+                std::fs::remove_file(output_parquet.as_path())?
+            };
+        }
         Ok(())
     }
 }

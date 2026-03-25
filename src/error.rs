@@ -21,4 +21,10 @@ pub enum UsageReportError {
     JinjaError(#[from] minijinja::Error),
     #[error(transparent)]
     InPlaceError(#[from] in_place::InPlaceError),
+    #[error(transparent)]
+    CsvError(#[from] csv::Error),
+    #[error("Empty file: {} is empty.\n {}",.filename,.message)]
+    EmptyFile { filename: String, message: String },
+    #[error("Empty list: {} is empty.\n {}",.listname,.message)]
+    EmptyList { listname: String, message: String },
 }
