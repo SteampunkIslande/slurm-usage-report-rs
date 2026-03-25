@@ -245,6 +245,12 @@ pub fn get_color(v: minijinja::Value, col_name: &str) -> Option<String> {
             "Efficacité CPU médiane",
             "Efficacité CPU minimum",
             "Efficacité CPU maximum",
+            "Nom de la règle",
+            "Durée moyenne",
+            "Durée médiane",
+            "Durée (écart-type)",
+            "Durée minimum",
+            "Durée maximum",
         ];
         // No special color for non numbers
         if !colored_cols.contains(&col_name) {
@@ -552,7 +558,7 @@ mod tests {
             v,
             json!({
                 "a": [1, 2, 3, 4],
-                "b": ["a", Value::Null, "c", "d"]
+                "b": ["a", Value::Null, "c", "d"],
             })
         )
     }

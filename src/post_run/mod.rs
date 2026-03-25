@@ -106,9 +106,10 @@ pub fn generate_snakemake_efficiency_report(
         None
     };
 
-    lf = aggregate_per_snakemake_rule(lf, input_sizes_csv.is_some());
+    let lf_agg = aggregate_per_snakemake_rule(lf.clone(), input_sizes_csv.is_some());
     let efficiency_table_mem = utils::df_to_columnar_json(
-        &(lf.clone()
+        &(lf_agg
+            .clone()
             .select(&[
                 col("rule_name"),
                 col("MemEfficiencyPercent_mean"),
@@ -129,7 +130,8 @@ pub fn generate_snakemake_efficiency_report(
             .collect()?),
     )?;
     let efficiency_table_cpu = utils::df_to_columnar_json(
-        &(lf.clone()
+        &(lf_agg
+            .clone()
             .select(&[
                 col("rule_name"),
                 col("CPUEfficiencyPercent_mean"),
@@ -150,7 +152,8 @@ pub fn generate_snakemake_efficiency_report(
             .collect()?),
     )?;
     let efficiency_table_runtime = utils::df_to_columnar_json(
-        &(lf.clone()
+        &(lf_agg
+            .clone()
             .select(&[
                 col("rule_name"),
                 col("ElapsedRaw_mean"),
@@ -172,7 +175,8 @@ pub fn generate_snakemake_efficiency_report(
     )?;
     let efficiency_table_relative_mem = if input_sizes_csv.is_some() {
         Some(utils::df_to_columnar_json(
-            &(lf.clone()
+            &(lf_agg
+                .clone()
                 .select(&[
                     col("rule_name"),
                     col("UsedRAMPerMo_mean"),
@@ -197,7 +201,8 @@ pub fn generate_snakemake_efficiency_report(
     };
     let efficiency_table_relative_runtime = if input_sizes_csv.is_some() {
         Some(utils::df_to_columnar_json(
-            &(lf.clone()
+            &(lf_agg
+                .clone()
                 .select(&[
                     col("rule_name"),
                     col("MinPerMo_mean"),

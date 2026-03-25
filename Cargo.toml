@@ -9,7 +9,7 @@ clap_complete = "4.6.0"
 csv = "1.4.0"
 duckdb = { version = "1.10500.0", features = ["parquet"] }
 include_dir = "0.7.4"
-minijinja = "2.18.0"
+minijinja = { version = "2.18.0", features = ["preserve_order"] }
 plotly = "0.14.1"
 polars = { version = "0.53.0", features = [
     "lazy",
@@ -20,7 +20,7 @@ polars = { version = "0.53.0", features = [
 ] }
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
+serde_json = { version = "1.0.149", features = ["preserve_order"] }
 in-place = "0.2.1"
 chrono = "0.4"
 in_place_macro = "0.2.0"

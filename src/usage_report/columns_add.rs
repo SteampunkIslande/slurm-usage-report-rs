@@ -530,13 +530,14 @@ pub fn add_metrics_relative_to_input_size(
     let query = format!(
         r#"
         COPY (
-            SELECT *,
+            SELECT run_metrics.*,
                 ((run_metrics.ElapsedRaw / 60.0) / (insizes.input_size_bytes / pow(2, 20))) AS MinPerMo,
-                ((run_metrics.ReqMem / pow(2, 20)) / (insizes.input_size_bytes / pow(2, 20))) AS UsedRAMPerMo
+                ((run_metrics.ReqMem / pow(2, 20)) / (insizes.input_size_bytes / pow(2, 20))) AS UsedRAMPerMo,
+                input_size_bytes,
+                inputs
             FROM read_parquet('{}') run_metrics
             LEFT JOIN read_csv('{}', delim='|') insizes
             ON insizes.slurm_jobid = run_metrics.JobID
-               AND insizes.input_size_bytes != 0
         ) TO '{}'
         "#,
         input_parquet.display(),

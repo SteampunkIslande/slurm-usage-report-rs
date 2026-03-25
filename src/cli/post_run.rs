@@ -35,7 +35,7 @@ pub struct PostRunCmd {
     /// Conserver tous les fichiers de sortie intermédiaires.
     ///
     /// Concerne:
-    /// - `sacct.parquet` (si `--db` n'est pas précisé): le résultat de la commande sacct pour les runs spécifiés (au format parquet)
+    /// - `sacct.parquet`: le résultat de la commande sacct pour les runs spécifiés (au format parquet) ou le parquet fusionné pour tous les jobs d'intérêt
     /// - `input_sizes.csv`: la liste des `slurm_jobid`, `job_id`, `rule_name`, `input_size_bytes`, `inputs` pour chaque job snakemake.
     #[arg(long, short)]
     keep_all_outputs: bool,
@@ -49,13 +49,16 @@ pub struct PostRunCmd {
 
 impl PostRunCmd {
     pub fn run(&self, cli: &Cli) -> Result<(), UsageReportError> {
+        // List of slurm names to gather metrics for
         let slurm_job_names = snakemake_parse_log::get_slurm_ids(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
         )?;
 
+        let input_sizes_path = Path::new("input_sizes.csv");
+
         snakemake_parse_log::parse_snakemake_log_files(
             &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
-            Path::new("input_sizes.csv"),
+            input_sizes_path,
         )?;
 
         let temp_sacct_csv = if self.db.is_none() {
@@ -110,10 +113,28 @@ impl PostRunCmd {
                         column: column!(),
                     })?,
                 )?;
-                let removed_lines = utils::sacct_sanitizer(Path::new("sacct.csv"), None, None)?;
+                let removed_lines = utils::sacct_sanitizer(
+                    temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
+                        message: "Logical error".into(),
+                        file: file!().into(),
+                        line: line!(),
+                        column: column!(),
+                    })?,
+                    None,
+                    None,
+                )?;
                 if cli.verbose {
                     eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
+                utils::csv_to_parquet(
+                    temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
+                        message: "Logical error".into(),
+                        file: file!().into(),
+                        line: line!(),
+                        column: column!(),
+                    })?,
+                    temp_sacct_parquet.as_path(),
+                )?;
             }
         }
         use slurm_usage_report_rs::post_run::generate_snakemake_efficiency_report;
@@ -126,7 +147,7 @@ impl PostRunCmd {
                 .map(|s| s.as_str())
                 .collect::<Vec<_>>(),
             self.output_parquet.as_deref(),
-            Some(Path::new("input_sizes.csv")),
+            Some(input_sizes_path),
         )?;
         Ok(())
     }
