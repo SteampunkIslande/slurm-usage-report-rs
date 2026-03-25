@@ -238,10 +238,9 @@
   {{ render_table(efficiency_table_mem) }}
 
   <h2>Efficacité mémoire (représentation graphique)</h2>
-  <p class="plot">
+  <div>
     {{ mem_box_plot | safe }}
-  </p>
-
+  </div>
   {% if efficiency_table_relative_runtime %}
   <h2>RAM utilisée par Mo d'entrée (table)</h2>
   <p>
@@ -255,9 +254,7 @@
   {{ render_table(efficiency_table_relative_mem) }}
 
   <h2>RAM utilisée par Mo d'entrée (boxplot)</h2>
-  <p class="plot">
-    {{ relative_mem_box_plot | safe }}
-  </p>
+  <p>{{ relative_mem_box_plot | safe }}</p>
   {% else %}
   <p style="font-weight: bold;">Les tailles des fichiers d'entrée n'ont malheureusement pas pu être récupérées pour ce
     run.</p>
@@ -324,10 +321,9 @@
   {{ render_table(efficiency_table_cpu) }}
 
   <h2>Efficacité CPU (représentation graphique)</h2>
-  <p class="plot">
+  <div>
     {{ cpu_box_plot | safe }}
-  </p>
-
+  </div>
   <h2>Durée d'exécution (en secondes)</h2>
   <p>
     La table ci-dessous mesure, pour chaque règle Snakemake, la durée d'exécution totale en secondes.
@@ -397,9 +393,7 @@
   {{ render_table(efficiency_table_runtime) }}
 
   <h2>Durée d'exécution (représentation graphique)</h2>
-  <p class="plot">
-    {{ runtime_box_plot | safe }}
-  </p>
+  <div>{{ runtime_box_plot | safe }}</div>
 
   {% if efficiency_table_relative_runtime %}
   <h2>Durée d'exécution par Mo d'entrée</h2>
@@ -414,9 +408,7 @@
     Plus ces valeurs sont rapprochées, plus la durée d'exécution est corrélée avec la taille des fichiers d'entrée,
     et de de façon linéaire (en première approximation).
   </p>
-  <p class="plot">
-    {{ relative_runtime_box_plot | safe }}
-  </p>
+  <div>{{ relative_runtime_box_plot | safe }}</div>
   {% else %}
   <p style="font-weight: bold;">Les tailles des fichiers d'entrée n'ont malheureusement pas pu être récupérées pour ce
     run.</p>

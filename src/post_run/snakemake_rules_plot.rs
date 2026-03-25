@@ -126,9 +126,15 @@ pub fn plot_snakemake_rules(
             .update_menus(vec![update_menus])
             .title(title)
             .x_axis(Axis::new().title(column))
-            .y_axis(Axis::new().title("Nom de la règle"))
+            .y_axis(
+                Axis::new()
+                    .title("Nom de la règle")
+                    .auto_margin(true)
+                    .tick_mode(plotly::common::TickMode::Auto)
+                    .tick_length(5),
+            )
             .show_legend(false)
-            .height(400 + 30 * rule_names.len()),
+            .height(400 + 40 * rule_names.len()),
     );
 
     Ok(figure.to_inline_html(div_name))
@@ -161,7 +167,7 @@ mod tests {
             res,
             r#"<div id="test_div" class="plotly-graph-div" style="height:100%; width:100%;"></div>
 <script type="text/javascript">
-    Plotly.newPlot("test_div", {"data":[{"type":"box","x":[50.0,45.0,55.0,70.0],"y":["rule3","rule3","rule3","rule3"],"name":"rule3","orientation":"h","boxpoints":"suspectedoutliers"},{"type":"box","x":[30.0,40.0],"y":["rule2","rule2"],"name":"rule2","orientation":"h","boxpoints":"suspectedoutliers"},{"type":"box","x":[10.0,20.0],"y":["rule1","rule1"],"name":"rule1","orientation":"h","boxpoints":"suspectedoutliers"}],"layout":{"title":{"text":"Durée d\u0027exécution (en minutes) par règle"},"showlegend":false,"height":490,"xaxis":{"title":{"text":"runtime"}},"yaxis":{"title":{"text":"Nom de la règle"}},"updatemenus":[{"active":0,"buttons":[{"args":[{"visible":[true,true,true]}],"label":"ALL","method":"restyle"},{"args":[{"visible":[true,false,false]}],"label":"rule3","method":"restyle"},{"args":[{"visible":[false,true,false]}],"label":"rule2","method":"restyle"},{"args":[{"visible":[false,false,true]}],"label":"rule1","method":"restyle"}],"direction":"down","showactive":true,"x":1.0,"y":1.02,"yanchor":"top"}]},"config":{},"frames":null});
+    Plotly.newPlot("test_div", {"data":[{"type":"box","x":[50.0,45.0,55.0,70.0],"y":["rule3","rule3","rule3","rule3"],"name":"rule3","orientation":"h","boxpoints":"suspectedoutliers"},{"type":"box","x":[30.0,40.0],"y":["rule2","rule2"],"name":"rule2","orientation":"h","boxpoints":"suspectedoutliers"},{"type":"box","x":[10.0,20.0],"y":["rule1","rule1"],"name":"rule1","orientation":"h","boxpoints":"suspectedoutliers"}],"layout":{"title":{"text":"Durée d\u0027exécution (en minutes) par règle"},"showlegend":false,"height":520,"xaxis":{"title":{"text":"runtime"}},"yaxis":{"title":{"text":"Nom de la règle"},"tickmode":"auto","ticklen":5,"automargin":true},"updatemenus":[{"active":0,"buttons":[{"args":[{"visible":[true,true,true]}],"label":"ALL","method":"restyle"},{"args":[{"visible":[true,false,false]}],"label":"rule3","method":"restyle"},{"args":[{"visible":[false,true,false]}],"label":"rule2","method":"restyle"},{"args":[{"visible":[false,false,true]}],"label":"rule1","method":"restyle"}],"direction":"down","showactive":true,"x":1.0,"y":1.02,"yanchor":"top"}]},"config":{},"frames":null});
 </script>"#
         );
     }
