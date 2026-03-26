@@ -576,4 +576,197 @@ mod tests {
             })
         )
     }
+
+    #[test]
+    fn test_df_to_columnar_json_empty_df() {
+        let df = df!(
+            "a" => Vec::<i32>::new(),
+            "b" => Vec::<String>::new()
+        )
+        .unwrap();
+        let v = df_to_columnar_json(&df).unwrap();
+        assert_eq!(
+            v,
+            json!({
+                "a": [],
+                "b": [],
+            })
+        );
+    }
+
+    #[test]
+    fn test_df_to_columnar_json_boolean() {
+        let df = df!(
+            "flag" => vec![true, false, true]
+        )
+        .unwrap();
+        let v = df_to_columnar_json(&df).unwrap();
+        assert_eq!(
+            v,
+            json!({
+                "flag": [true, false, true],
+            })
+        );
+    }
+
+    #[test]
+    fn test_df_to_columnar_json_float() {
+        let df = df!(
+            "val" => vec![1.5f64, 2.5, 3.5]
+        )
+        .unwrap();
+        let v = df_to_columnar_json(&df).unwrap();
+        assert_eq!(
+            v,
+            json!({
+                "val": [1.5, 2.5, 3.5],
+            })
+        );
+    }
+
+    // ── format_header tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_format_header_basic() {
+        assert_eq!(format_header("hello_world"), "hello\nworld");
+    }
+
+    #[test]
+    fn test_format_header_multiple_underscores() {
+        assert_eq!(
+            format_header("Mem_Efficiency_Percent"),
+            "Mem\nEfficiency\nPercent"
+        );
+    }
+
+    #[test]
+    fn test_format_header_no_underscores() {
+        assert_eq!(format_header("hello"), "hello");
+    }
+
+    #[test]
+    fn test_format_header_empty() {
+        assert_eq!(format_header(""), "");
+    }
+
+    #[test]
+    fn test_format_header_leading_trailing_underscores() {
+        assert_eq!(format_header("_hello_"), "\nhello\n");
+    }
+
+    // ── get_color tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_get_color_red_low() {
+        let v = minijinja::Value::from(10.0f32);
+        assert_eq!(
+            get_color(v, "Efficacité mémoire moyenne"),
+            Some("#ff0000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_color_yellow() {
+        let v = minijinja::Value::from(30.0f32);
+        assert_eq!(
+            get_color(v, "Efficacité CPU médiane"),
+            Some("#d4a500".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_color_orange() {
+        let v = minijinja::Value::from(70.0f32);
+        assert_eq!(
+            get_color(v, "Efficacité mémoire minimum"),
+            Some("#ffa500".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_color_green() {
+        let v = minijinja::Value::from(85.0f32);
+        assert_eq!(
+            get_color(v, "Efficacité CPU maximum"),
+            Some("#008000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_color_above_150() {
+        let v = minijinja::Value::from(200.0f32);
+        assert_eq!(
+            get_color(v, "Efficacité mémoire moyenne"),
+            Some("#ff0000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_color_boundary_values() {
+        // Boundary at 0
+        let v = minijinja::Value::from(0.0f32);
+        assert_eq!(get_color(v, "Durée moyenne"), Some("#ff0000".to_string()));
+
+        // Boundary at 20 (within 0-20 range)
+        let v = minijinja::Value::from(20.0f32);
+        assert_eq!(get_color(v, "Durée moyenne"), Some("#ff0000".to_string()));
+
+        // Boundary at 21 (start of next range)
+        let v = minijinja::Value::from(21.0f32);
+        assert_eq!(get_color(v, "Durée moyenne"), Some("#d4a500".to_string()));
+
+        // Boundary at 100
+        let v = minijinja::Value::from(100.0f32);
+        assert_eq!(get_color(v, "Durée moyenne"), Some("#008000".to_string()));
+    }
+
+    #[test]
+    fn test_get_color_non_colored_column() {
+        let v = minijinja::Value::from(50.0f32);
+        assert_eq!(get_color(v, "Some Other Column"), None);
+    }
+
+    #[test]
+    fn test_get_color_non_numeric_value() {
+        let v = minijinja::Value::from("not a number");
+        assert_eq!(get_color(v, "Efficacité mémoire moyenne"), None);
+    }
+
+    #[test]
+    fn test_get_color_negative_value() {
+        let v = minijinja::Value::from(-5.0f32);
+        assert_eq!(
+            get_color(v, "Efficacité mémoire moyenne"),
+            Some("#ff0000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_color_all_colored_columns() {
+        let v = minijinja::Value::from(85.0f32);
+        let colored_cols = [
+            "Efficacité mémoire moyenne",
+            "Efficacité mémoire médiane",
+            "Efficacité mémoire minimum",
+            "Efficacité mémoire maximum",
+            "Efficacité CPU moyenne",
+            "Efficacité CPU médiane",
+            "Efficacité CPU minimum",
+            "Efficacité CPU maximum",
+            "Nom de la règle",
+            "Durée moyenne",
+            "Durée médiane",
+            "Durée (écart-type)",
+            "Durée minimum",
+            "Durée maximum",
+        ];
+        for col_name in colored_cols {
+            assert_eq!(
+                get_color(v.clone(), col_name),
+                Some("#008000".to_string()),
+                "Column '{}' should return green for value 85",
+                col_name
+            );
+        }
+    }
 }

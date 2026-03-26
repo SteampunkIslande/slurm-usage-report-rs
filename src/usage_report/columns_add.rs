@@ -557,6 +557,14 @@ mod tests {
     use super::*;
     use polars::df;
 
+    fn av_str(v: &AnyValue) -> String {
+        match v {
+            AnyValue::String(s) => s.to_string(),
+            AnyValue::StringOwned(s) => s.to_string(),
+            _ => panic!("Expected string AnyValue, got: {:?}", v),
+        }
+    }
+
     fn create_test_lazyframe(data: &[(&str, &str, &str, &str)]) -> LazyFrame {
         let df = df!(
             "JobID" => data.iter().map(|(id, _, _, _)| (*id).to_string()).collect::<Vec<String>>(),
@@ -838,5 +846,345 @@ mod tests {
         eprintln!("test_half_hour_job: got {} hours", duration_value);
 
         assert!((duration_value - 0.5).abs() < 0.001);
+    }
+
+    // ── add_slurm_jobinfo_type_columns tests ──────────────────────────────
+
+    fn create_jobid_lazyframe(job_ids: &[&str]) -> LazyFrame {
+        let df = df!(
+            "JobID" => job_ids.iter().map(|s| s.to_string()).collect::<Vec<String>>()
+        )
+        .unwrap();
+        df.lazy()
+    }
+
+    #[test]
+    fn test_slurm_jobinfo_allocation() {
+        let lf = create_jobid_lazyframe(&["12345"]);
+        let result = add_slurm_jobinfo_type_columns(lf).collect().unwrap();
+
+        let job_root = result.column("JobRoot").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_root), "12345");
+
+        let job_info = result.column("JobInfoType").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_info), "allocation");
+    }
+
+    #[test]
+    fn test_slurm_jobinfo_batch() {
+        let lf = create_jobid_lazyframe(&["12345.batch"]);
+        let result = add_slurm_jobinfo_type_columns(lf).collect().unwrap();
+
+        let job_root = result.column("JobRoot").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_root), "12345");
+
+        let job_info = result.column("JobInfoType").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_info), "batch");
+    }
+
+    #[test]
+    fn test_slurm_jobinfo_extern() {
+        let lf = create_jobid_lazyframe(&["12345.extern"]);
+        let result = add_slurm_jobinfo_type_columns(lf).collect().unwrap();
+
+        let job_root = result.column("JobRoot").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_root), "12345");
+
+        let job_info = result.column("JobInfoType").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_info), "extern");
+    }
+
+    #[test]
+    fn test_slurm_jobinfo_step() {
+        let lf = create_jobid_lazyframe(&["12345.0", "12345.1", "12345.42"]);
+        let result = add_slurm_jobinfo_type_columns(lf).collect().unwrap();
+
+        for i in 0..3 {
+            let job_info = result.column("JobInfoType").unwrap().get(i).unwrap();
+            assert_eq!(
+                av_str(&job_info),
+                "step",
+                "JobID suffix .{} should be classified as step",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_slurm_jobinfo_unknown() {
+        let lf = create_jobid_lazyframe(&["12345.abc"]);
+        let result = add_slurm_jobinfo_type_columns(lf).collect().unwrap();
+
+        let job_info = result.column("JobInfoType").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&job_info), "unknown");
+    }
+
+    #[test]
+    fn test_slurm_jobinfo_mixed() {
+        let lf = create_jobid_lazyframe(&[
+            "100",
+            "100.batch",
+            "100.extern",
+            "100.0",
+            "200",
+            "200.batch",
+        ]);
+        let result = add_slurm_jobinfo_type_columns(lf).collect().unwrap();
+
+        let expected_types = [
+            "allocation",
+            "batch",
+            "extern",
+            "step",
+            "allocation",
+            "batch",
+        ];
+        let expected_roots = ["100", "100", "100", "100", "200", "200"];
+
+        for (i, (exp_type, exp_root)) in
+            expected_types.iter().zip(expected_roots.iter()).enumerate()
+        {
+            let job_info = result.column("JobInfoType").unwrap().get(i).unwrap();
+            assert_eq!(
+                av_str(&job_info),
+                *exp_type,
+                "Row {} JobInfoType mismatch",
+                i
+            );
+            let job_root = result.column("JobRoot").unwrap().get(i).unwrap();
+            assert_eq!(av_str(&job_root), *exp_root, "Row {} JobRoot mismatch", i);
+        }
+    }
+
+    // ── add_snakerule_col tests ───────────────────────────────────────────
+
+    fn create_comment_lazyframe(comments: &[&str]) -> LazyFrame {
+        let df = df!(
+            "Comment" => comments.iter().map(|s| s.to_string()).collect::<Vec<String>>()
+        )
+        .unwrap();
+        df.lazy()
+    }
+
+    #[test]
+    fn test_snakerule_with_wildcards() {
+        let lf = create_comment_lazyframe(&["rule_align_wildcards_sample1"]);
+        let result = add_snakerule_col(lf).collect().unwrap();
+
+        let rule = result.column("rule_name").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&rule), "align");
+
+        let wildcards = result.column("wildcards").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&wildcards), "sample1");
+    }
+
+    #[test]
+    fn test_snakerule_without_wildcards() {
+        let lf = create_comment_lazyframe(&["rule_merge"]);
+        let result = add_snakerule_col(lf).collect().unwrap();
+
+        let rule = result.column("rule_name").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&rule), "merge");
+
+        let wildcards = result.column("wildcards").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&wildcards), "");
+    }
+
+    #[test]
+    fn test_snakerule_non_rule_comment() {
+        let lf = create_comment_lazyframe(&["some random comment"]);
+        let result = add_snakerule_col(lf).collect().unwrap();
+
+        let rule = result.column("rule_name").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&rule), "");
+
+        let wildcards = result.column("wildcards").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&wildcards), "");
+    }
+
+    #[test]
+    fn test_snakerule_complex_rule_name() {
+        let lf =
+            create_comment_lazyframe(&["rule_map_reads_to_genome_wildcards_sampleA_conditionB"]);
+        let result = add_snakerule_col(lf).collect().unwrap();
+
+        let rule = result.column("rule_name").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&rule), "map_reads_to_genome");
+
+        let wildcards = result.column("wildcards").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&wildcards), "sampleA_conditionB");
+    }
+
+    // ── add_units_kmg tests ──────────────────────────────────────────────
+
+    fn create_kmg_lazyframe(colname: &str, values: &[&str]) -> LazyFrame {
+        let df = df!(
+            colname => values.iter().map(|s| s.to_string()).collect::<Vec<String>>()
+        )
+        .unwrap();
+        df.lazy()
+    }
+
+    #[test]
+    fn test_add_units_kmg_kilobytes() {
+        let lf = create_kmg_lazyframe("MaxRSS", &["512K"]);
+        let result = add_units_kmg(lf, "MaxRSS").collect().unwrap();
+
+        let val = result.column("MaxRSS").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&val), "512");
+
+        let unit = result.column("MaxRSS_unit").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&unit), "K");
+    }
+
+    #[test]
+    fn test_add_units_kmg_megabytes() {
+        let lf = create_kmg_lazyframe("MaxRSS", &["1024M"]);
+        let result = add_units_kmg(lf, "MaxRSS").collect().unwrap();
+
+        let val = result.column("MaxRSS").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&val), "1024");
+
+        let unit = result.column("MaxRSS_unit").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&unit), "M");
+    }
+
+    #[test]
+    fn test_add_units_kmg_gigabytes() {
+        let lf = create_kmg_lazyframe("MaxRSS", &["8G"]);
+        let result = add_units_kmg(lf, "MaxRSS").collect().unwrap();
+
+        let val = result.column("MaxRSS").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&val), "8");
+
+        let unit = result.column("MaxRSS_unit").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&unit), "G");
+    }
+
+    #[test]
+    fn test_add_units_kmg_terabytes() {
+        let lf = create_kmg_lazyframe("MaxRSS", &["2T"]);
+        let result = add_units_kmg(lf, "MaxRSS").collect().unwrap();
+
+        let val = result.column("MaxRSS").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&val), "2");
+
+        let unit = result.column("MaxRSS_unit").unwrap().get(0).unwrap();
+        assert_eq!(av_str(&unit), "T");
+    }
+
+    #[test]
+    fn test_add_units_kmg_no_match() {
+        let lf = create_kmg_lazyframe("MaxRSS", &["unknown"]);
+        let result = add_units_kmg(lf, "MaxRSS").collect().unwrap();
+
+        let val = result.column("MaxRSS").unwrap().get(0).unwrap();
+        assert!(!matches!(val, AnyValue::String(_) | AnyValue::StringOwned(_)) || val.is_null());
+    }
+
+    // ── parse_total_cpu_col tests ─────────────────────────────────────────
+
+    fn create_totalcpu_lazyframe(values: &[&str]) -> LazyFrame {
+        let df = df!(
+            "TotalCPU" => values.iter().map(|s| s.to_string()).collect::<Vec<String>>()
+        )
+        .unwrap();
+        df.lazy()
+    }
+
+    #[test]
+    fn test_parse_total_cpu_hms_format() {
+        // HH:MM:SS = 1:30:45 = 5445 seconds
+        let lf = create_totalcpu_lazyframe(&["1:30:45"]);
+        let result = parse_total_cpu_col(lf).collect().unwrap();
+
+        let secs = result.column("TotalCPU_seconds").unwrap().get(0).unwrap();
+        assert_eq!(secs.try_extract::<i64>().unwrap(), 5445);
+    }
+
+    #[test]
+    fn test_parse_total_cpu_days_format() {
+        // DD-HH:MM:SS = 2-05:30:15 = 2*86400 + 5*3600 + 30*60 + 15 = 192615 seconds
+        let lf = create_totalcpu_lazyframe(&["2-05:30:15"]);
+        let result = parse_total_cpu_col(lf).collect().unwrap();
+
+        let secs = result.column("TotalCPU_seconds").unwrap().get(0).unwrap();
+        assert_eq!(secs.try_extract::<i64>().unwrap(), 192615);
+    }
+
+    #[test]
+    fn test_parse_total_cpu_ms_format() {
+        // MM:SS.ms = 15:30.123 -> 15*60 + 30 = 930 seconds (fractional part truncated)
+        let lf = create_totalcpu_lazyframe(&["15:30.123"]);
+        let result = parse_total_cpu_col(lf).collect().unwrap();
+
+        let secs = result.column("TotalCPU_seconds").unwrap().get(0).unwrap();
+        assert_eq!(secs.try_extract::<i64>().unwrap(), 930);
+    }
+
+    #[test]
+    fn test_parse_total_cpu_zero_values() {
+        // 0:00:00 = 0 seconds
+        let lf = create_totalcpu_lazyframe(&["0:00:00"]);
+        let result = parse_total_cpu_col(lf).collect().unwrap();
+
+        let secs = result.column("TotalCPU_seconds").unwrap().get(0).unwrap();
+        assert_eq!(secs.try_extract::<i64>().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_parse_total_cpu_mixed_formats() {
+        let lf = create_totalcpu_lazyframe(&["1:30:45", "2-05:30:15", "15:30.123"]);
+        let result = parse_total_cpu_col(lf).collect().unwrap();
+
+        let expected: [i64; 3] = [5445, 192615, 930];
+        for (i, &exp) in expected.iter().enumerate() {
+            let secs = result.column("TotalCPU_seconds").unwrap().get(i).unwrap();
+            assert_eq!(
+                secs.try_extract::<i64>().unwrap(),
+                exp,
+                "TotalCPU_seconds mismatch at row {}",
+                i
+            );
+        }
+    }
+
+    // ── add_job_duration_cols tests ──────────────────────────────────────
+
+    #[test]
+    fn test_job_duration_basic() {
+        let lf = create_test_lazyframe(&[(
+            "1",
+            "2026-02-24T10:00:00",
+            "2026-02-24T14:30:00",
+            "2026-02-24T10:00:00",
+        )]);
+        let result = add_job_duration_cols(lf).collect().unwrap();
+
+        let duration = result
+            .column("job_duration_seconds")
+            .unwrap()
+            .get(0)
+            .unwrap();
+        // 4h30m = 16200 seconds
+        assert_eq!(duration.try_extract::<i64>().unwrap(), 16200);
+    }
+
+    #[test]
+    fn test_job_duration_zero() {
+        let lf = create_test_lazyframe(&[(
+            "1",
+            "2026-02-24T10:00:00",
+            "2026-02-24T10:00:00",
+            "2026-02-24T10:00:00",
+        )]);
+        let result = add_job_duration_cols(lf).collect().unwrap();
+
+        let duration = result
+            .column("job_duration_seconds")
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(duration.try_extract::<i64>().unwrap(), 0);
     }
 }
