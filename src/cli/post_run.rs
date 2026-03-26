@@ -111,10 +111,7 @@ impl PostRunCmd {
             }
             None => {
                 sacct_get::get_sacct_for_runs(
-                    &slurm_job_names
-                        .iter()
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>(),
+                    &slurm_job_names,
                     temp_sacct_csv
                         .as_ref()
                         .ok_or(UsageReportError::NoneValueError {
@@ -159,7 +156,7 @@ impl PostRunCmd {
             self.output_html.as_path(),
             temp_sacct_parquet.as_path(),
             slurm_job_names,
-            self.output_parquet.as_ref().map(|o| o.as_path()),
+            self.output_parquet.as_deref(),
             Some(input_sizes_path.as_path()),
         )?;
         Ok(())
