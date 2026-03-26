@@ -23,7 +23,6 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 in-place = "0.2.1"
 chrono = "0.4"
-in_place_macro = "0.2.0"
 thiserror = "2.0.18"
 
 [dev-dependencies]

@@ -17,7 +17,6 @@
 use std::path::Path;
 
 use duckdb::Connection;
-use in_place_macro::auto_rename;
 use polars::prelude::*;
 
 use crate::UsageReportError;
@@ -516,16 +515,17 @@ pub fn parse_total_cpu_col(mut lf: LazyFrame) -> LazyFrame {
 /// Adds columns to input_parquet (in-place)
 ///
 /// # Arguments
-///
-/// - `input_parquet` (`&str`) - Parquet file to add columns to.
-/// - `input_sizes` (`&str`) - Path to a csv file.
-/// - `output_parquet` (`&str`) - Describe this parameter.
-#[auto_rename(output_parquet overwrites input_parquet)]
-pub fn add_metrics_relative_to_input_size(
-    input_parquet: &Path,
-    input_sizes: &Path,
-    output_parquet: &Path,
-) -> Result<(), UsageReportError> {
+/// - `input_parquet`: Path to the parquet you'd like to enrich
+/// - `input_sizes`: Path to a CSV file with actual pipeline inputs sizes
+pub fn add_metrics_relative_to_input_size_inplace<P>(
+    input_parquet: P,
+    input_sizes: P,
+) -> Result<(), UsageReportError>
+where
+    P: AsRef<Path>,
+{
+    let intermediary_file = input_parquet.as_ref().with_extension(".tmp.parquet");
+
     let conn: Connection = duckdb::Connection::open_in_memory()?;
     let query = format!(
         r#"
@@ -540,12 +540,16 @@ pub fn add_metrics_relative_to_input_size(
             ON insizes.slurm_jobid = run_metrics.JobID
         ) TO '{}'
         "#,
-        input_parquet.display(),
-        input_sizes.display(),
-        output_parquet.display()
+        input_parquet.as_ref().display(),
+        input_sizes.as_ref().display(),
+        intermediary_file.display()
     );
 
     conn.execute(&query, [])?;
+
+    std::fs::rename(&intermediary_file, input_parquet)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

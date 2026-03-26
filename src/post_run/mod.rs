@@ -11,7 +11,7 @@ pub use sacct_get::*;
 use std::{fs::OpenOptions, path::Path};
 
 use crate::{
-    JINJA_ENV, UsageReportError, add_metrics_relative_to_input_size, add_snakerule_col,
+    JINJA_ENV, UsageReportError, add_metrics_relative_to_input_size_inplace, add_snakerule_col,
     aggregate_per_snakemake_rule, generic_report, utils,
 };
 
@@ -53,11 +53,7 @@ where
 
         // Cette fonction est `in-place`, c'est à dire qu'elle est conçue pour prendre le même chemin en entrée et en sortie
         // En l'occurence, le fichier temporaire que l'on vient de créer
-        add_metrics_relative_to_input_size(
-            parquet_temp.as_path(),
-            input_sizes.as_ref(),
-            parquet_temp.as_path(),
-        )?;
+        add_metrics_relative_to_input_size_inplace(parquet_temp.as_path(), input_sizes.as_ref())?;
 
         // Plus besoin du fichier temporaire, on remplace input_parquet par le fichier enrichi
         std::fs::rename(parquet_temp, input_parquet.as_ref())?;
