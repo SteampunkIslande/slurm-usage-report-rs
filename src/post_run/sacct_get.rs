@@ -3,39 +3,42 @@ use std::{fs::OpenOptions, process::Command};
 
 use crate::UsageReportError;
 
-pub fn get_sacct_for_runs(run_ids: &[&str], output_path: &Path) -> Result<(), UsageReportError> {
+pub fn get_sacct_for_runs<I, S, P>(run_ids: I, output_path: P) -> Result<(), UsageReportError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+    P: AsRef<Path>,
+{
     let out_file = OpenOptions::new()
         .create_new(true)
         .write(true)
         .open(output_path)?;
-    let cmd_str = format!(
-        "{} {} {} {} {} {} {} {} {}",
-        "sacct",
-        "-S",
-        "1970-01-01", // pour être sûr d'avoir tous les jobs, même ceux qui ont été lancés il y a longtemps
-        "-a",
-        "--name",
-        run_ids.join(",").as_str(),
-        "-o",
-        "ALL",
-        "-P",
-    );
+
+    let joined = run_ids
+        .into_iter()
+        .map(|s| s.as_ref().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let cmd_str = format!("sacct -S 1970-01-01 -a --name {} -o ALL -P", joined);
+
     let cmd_output = Command::new("sacct")
         .args([
-            "sacct",
             "-S",
-            "1970-01-01", // pour être sûr d'avoir tous les jobs, même ceux qui ont été lancés il y a longtemps
+            "1970-01-01",
             "-a",
             "--name",
-            run_ids.join(",").as_str(),
+            &joined,
             "-o",
             "ALL",
             "-P",
         ])
         .stdout(out_file)
         .output()?;
+
     if !cmd_output.status.success() {
         return Err(UsageReportError::ExternalProcessError { cmd: cmd_str });
     }
+
     Ok(())
 }

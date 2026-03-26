@@ -86,8 +86,11 @@ impl Serialize for ParsedRecord {
 /// En effet, l'utilisateur peut avoir spécifié des chemins relatifs. Ces derniers sont relatifs au dossier d'exécution du pipeline, qui lui-même contient le dossier .snakemake à sa racine.
 ///
 /// Retourne `None` si la structure attendue (`<project>/.snakemake/log/<file>.log`) n'est pas respectée.
-fn find_project_dir(log_path: &Path) -> Option<PathBuf> {
-    let parent = log_path.parent()?;
+fn find_project_dir<P>(log_path: P) -> Option<PathBuf>
+where
+    P: AsRef<Path>,
+{
+    let parent = log_path.as_ref().parent()?;
     let grandparent = parent.parent()?;
     if parent.file_name()?.to_str()? != "log" || grandparent.file_name()?.to_str()? != ".snakemake"
     {
@@ -112,7 +115,10 @@ struct LogRecordIter {
 }
 
 impl LogRecordIter {
-    fn new(log_path: &Path) -> io::Result<Self> {
+    fn new<P>(log_path: P) -> io::Result<Self>
+    where
+        P: AsRef<Path>,
+    {
         let file = File::open(log_path)?;
         let reader = BufReader::new(file);
         Ok(Self {
@@ -166,8 +172,11 @@ impl Iterator for LogRecordIter {
 /// l'intégralité du fichier en mémoire.
 ///
 /// Ignore le préambule avant la première ligne commençant par `[`.
-fn snakemake_log_records(log_path: &Path) -> io::Result<LogRecordIter> {
-    LogRecordIter::new(log_path)
+fn snakemake_log_records<P>(log_path: P) -> io::Result<LogRecordIter>
+where
+    P: AsRef<Path>,
+{
+    LogRecordIter::new(log_path.as_ref())
 }
 
 /// Extraire les champs pertinents d'un enregistrement (groupe de lignes).
@@ -198,18 +207,21 @@ fn extract_from_record(record_lines: &[String]) -> ParsedRecord {
 /// # Errors
 ///
 /// Retourne une erreur si le fichier de log ou le fichier de sortie ne peut pas être ouvert/lu/écrit.
-fn parse_snakemake_log_file(
-    log_path: &Path,
-    output_path: &Path,
+fn parse_snakemake_log_file<P>(
+    log_path: P,
+    output_path: P,
     write_header: bool,
-) -> Result<(), UsageReportError> {
+) -> Result<(), UsageReportError>
+where
+    P: AsRef<Path>,
+{
     let original_dir = env::current_dir()?;
 
-    if let Some(project_dir) = find_project_dir(log_path) {
+    if let Some(project_dir) = find_project_dir(log_path.as_ref()) {
         env::set_current_dir(&project_dir)?;
     }
 
-    let records = snakemake_log_records(log_path)?;
+    let records = snakemake_log_records(log_path.as_ref())?;
 
     let out_file = OpenOptions::new()
         .create(true)
@@ -238,19 +250,24 @@ fn parse_snakemake_log_file(
     Ok(())
 }
 
-pub fn parse_snakemake_log_files(
-    log_paths: &[&Path],
-    output_path: &Path,
-) -> Result<(), UsageReportError> {
-    for (i, log_path) in log_paths.iter().enumerate() {
-        parse_snakemake_log_file(log_path, output_path, i == 0)?;
+pub fn parse_snakemake_log_files<I, P>(log_paths: I, output_path: P) -> Result<(), UsageReportError>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    for (i, log_path) in log_paths.into_iter().enumerate() {
+        parse_snakemake_log_file(log_path.as_ref(), output_path.as_ref(), i == 0)?;
     }
     Ok(())
 }
 
-pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
+pub fn get_slurm_ids<I, P>(log_paths: I) -> io::Result<Vec<String>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
     Ok(log_paths
-        .iter()
+        .into_iter()
         .map(|p| {
             File::open(p).map(BufReader::new).map(|f| {
                 f.lines()
@@ -282,7 +299,10 @@ pub fn get_slurm_ids(log_paths: &[&Path]) -> io::Result<Vec<String>> {
 ///
 /// - `Vec<String>` - All the dates from the beginning of the snakemake run to the end,
 ///   using format `YY-mm-DD`
-pub fn get_snakemake_run_span(log_path: &Path) -> HashSet<String> {
+pub fn get_snakemake_run_span<P>(log_path: P) -> HashSet<String>
+where
+    P: AsRef<Path>,
+{
     let file = File::open(log_path);
     let file = match file {
         Ok(f) => f,

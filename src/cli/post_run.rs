@@ -1,10 +1,6 @@
 use clap::Parser;
 use slurm_usage_report_rs::{UsageReportError, sacct_get, snakemake_parse_log, utils};
-use std::{
-    collections::HashSet,
-    io::ErrorKind,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, io::ErrorKind, path::PathBuf};
 
 use crate::cli::Cli;
 
@@ -43,24 +39,39 @@ pub struct PostRunCmd {
     db: Option<PathBuf>,
 }
 
+fn checks(command: &PostRunCmd, _cli: &Cli) -> Result<(), UsageReportError> {
+    if let Some(db) = &command.db {
+        if !db.is_dir() {
+            return Err(UsageReportError::IOError(std::io::Error::new(
+                ErrorKind::NotADirectory,
+                format!("{} is not a directory!", db.display()),
+            )));
+        } else if !db.exists() {
+            return Err(UsageReportError::IOError(std::io::Error::new(
+                ErrorKind::NotFound,
+                format!("{} does not exist!", db.display()),
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl PostRunCmd {
     pub fn run(&self, cli: &Cli) -> Result<(), UsageReportError> {
-        // List of slurm names to gather metrics for
-        let slurm_job_names = snakemake_parse_log::get_slurm_ids(
-            &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
-        )?;
+        // Run checks before even thinking about running this CLI entry point.
+        checks(self, cli)?;
 
-        let input_sizes_path = Path::new("input_sizes.csv");
+        // List of slurm names to gather metrics for
+        let slurm_job_names = snakemake_parse_log::get_slurm_ids(&self.input)?;
+
+        let input_sizes_path = PathBuf::from("input_sizes.csv");
 
         // Get input_sizes. If we fail, we remove them
-        snakemake_parse_log::parse_snakemake_log_files(
-            &self.input.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
-            input_sizes_path,
-        )?;
+        snakemake_parse_log::parse_snakemake_log_files(&self.input, &input_sizes_path)?;
 
         // Path to the temporary intermediary sacct.csv. Will only be kept if we cannot convert it to parquet
         let temp_sacct_csv = if self.db.is_none() {
-            Some(Path::new("sacct.csv"))
+            Some(PathBuf::from("sacct.csv"))
         } else {
             None
         };
@@ -95,13 +106,7 @@ impl PostRunCmd {
                             message: "La liste des fichiers parquet pour l'analyse est vide. Impossible de continuer".into(),
                         });
                     }
-                    utils::merge_parquets(
-                        &input_parquets
-                            .iter()
-                            .map(|p| p.as_path())
-                            .collect::<Vec<_>>(),
-                        &temp_sacct_parquet,
-                    )?;
+                    utils::merge_parquets(&input_parquets, &temp_sacct_parquet)?;
                 }
             }
             None => {
@@ -110,20 +115,24 @@ impl PostRunCmd {
                         .iter()
                         .map(|s| s.as_str())
                         .collect::<Vec<_>>(),
-                    temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
-                        message: "Logical error".into(),
-                        file: file!().into(),
-                        line: line!(),
-                        column: column!(),
-                    })?,
+                    temp_sacct_csv
+                        .as_ref()
+                        .ok_or(UsageReportError::NoneValueError {
+                            message: "Logical error".into(),
+                            file: file!().into(),
+                            line: line!(),
+                            column: column!(),
+                        })?,
                 )?;
                 let removed_lines = utils::sacct_sanitizer(
-                    temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
-                        message: "Logical error".into(),
-                        file: file!().into(),
-                        line: line!(),
-                        column: column!(),
-                    })?,
+                    temp_sacct_csv
+                        .as_ref()
+                        .ok_or(UsageReportError::NoneValueError {
+                            message: "Logical error".into(),
+                            file: file!().into(),
+                            line: line!(),
+                            column: column!(),
+                        })?,
                     None,
                     None,
                 )?;
@@ -131,12 +140,15 @@ impl PostRunCmd {
                     eprintln!("Removed {} lines from SACCT output", removed_lines);
                 }
                 utils::csv_to_parquet(
-                    temp_sacct_csv.ok_or(UsageReportError::NoneValueError {
-                        message: "Logical error".into(),
-                        file: file!().into(),
-                        line: line!(),
-                        column: column!(),
-                    })?,
+                    temp_sacct_csv
+                        .as_ref()
+                        .ok_or(UsageReportError::NoneValueError {
+                            message: "Logical error".into(),
+                            file: file!().into(),
+                            line: line!(),
+                            column: column!(),
+                        })?
+                        .as_path(),
                     temp_sacct_parquet.as_path(),
                 )?;
             }
@@ -144,14 +156,11 @@ impl PostRunCmd {
         use slurm_usage_report_rs::post_run::generate_snakemake_efficiency_report;
 
         generate_snakemake_efficiency_report(
-            &self.output_html,
-            &temp_sacct_parquet,
-            &slurm_job_names
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<_>>(),
-            self.output_parquet.as_deref(),
-            Some(input_sizes_path),
+            self.output_html.as_path(),
+            temp_sacct_parquet.as_path(),
+            slurm_job_names,
+            self.output_parquet.as_ref().map(|o| o.as_path()),
+            Some(input_sizes_path.as_path()),
         )?;
         Ok(())
     }

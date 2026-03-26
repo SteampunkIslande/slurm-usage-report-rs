@@ -15,20 +15,25 @@ use crate::{
     aggregate_per_snakemake_rule, generic_report, utils,
 };
 
-pub fn generate_snakemake_efficiency_report(
-    output_html: &Path,
-    input_parquet: &Path,
-    job_names: &[&str],
-    output_parquet: Option<&Path>,
-    input_sizes_csv: Option<&Path>,
-) -> Result<(), UsageReportError> {
+pub fn generate_snakemake_efficiency_report<I, P, S>(
+    output_html: P,
+    input_parquet: P,
+    job_names: I,
+    output_parquet: Option<P>,
+    input_sizes_csv: Option<P>,
+) -> Result<(), UsageReportError>
+where
+    I: IntoIterator<Item = S>,
+    P: AsRef<Path>,
+    S: AsRef<str>,
+{
     use crate::utils::sink_parquet;
     use polars::prelude::*;
     use serde_json::json;
     use std::io::Write;
 
     let args = ScanArgsParquet::default();
-    let mut lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet)?, args)?;
+    let mut lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet.as_ref())?, args)?;
 
     lf = generic_report(lf)?;
     // Filter by job name, only after the aggregate is done
@@ -36,30 +41,30 @@ pub fn generate_snakemake_efficiency_report(
         lf = lf.filter(
             col("JobName")
                 .str()
-                .contains(lit(job_name.to_string()), false),
+                .contains(lit(job_name.as_ref().to_string()), false),
         );
     }
     lf = add_snakerule_col(lf);
 
-    if let Some(input_sizes) = input_sizes_csv {
+    if let Some(input_sizes) = input_sizes_csv.as_ref() {
         // Sauvegarder le parquet en cours de lecture par le lazyframe, car on s'apprête à écrire dedans
-        let parquet_temp = input_parquet.with_extension("tmp.parquet");
+        let parquet_temp = input_parquet.as_ref().with_extension("tmp.parquet");
         sink_parquet(lf, &parquet_temp)?;
 
         // Cette fonction est `in-place`, c'est à dire qu'elle est conçue pour prendre le même chemin en entrée et en sortie
         // En l'occurence, le fichier temporaire que l'on vient de créer
         add_metrics_relative_to_input_size(
             parquet_temp.as_path(),
-            input_sizes,
+            input_sizes.as_ref(),
             parquet_temp.as_path(),
         )?;
 
         // Plus besoin du fichier temporaire, on remplace input_parquet par le fichier enrichi
-        std::fs::rename(parquet_temp, input_parquet)?;
+        std::fs::rename(parquet_temp, input_parquet.as_ref())?;
 
         // input_parquet a été enrichi, on le réouvre sous forme de Layframe pour continuer l'extraction des données
         lf = LazyFrame::scan_parquet(
-            PlRefPath::try_from_path(input_parquet)?,
+            PlRefPath::try_from_path(input_parquet.as_ref())?,
             ScanArgsParquet::default(),
         )?;
     }
@@ -249,7 +254,7 @@ pub fn generate_snakemake_efficiency_report(
     write!(f, "{}", output)?;
 
     if let Some(output_parquet) = output_parquet {
-        utils::sink_parquet(lf.clone(), output_parquet)?;
+        utils::sink_parquet(lf.clone(), output_parquet.as_ref())?;
     }
 
     Ok(())

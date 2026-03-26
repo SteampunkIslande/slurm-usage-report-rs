@@ -35,12 +35,15 @@ use crate::UsageReportError;
 /// Une chaîne de caractères contenant un div HTML unique avec combobox et graphiques.
 /// N'inclus pas le script de plotly.js, celui-ci doit être ajouté au header
 /// du document html dans lequel ce graphique est utilisé
-pub fn plot_snakemake_rules(
+pub fn plot_snakemake_rules<S>(
     lf: &LazyFrame,
-    column: &str,
-    title: &str,
-    div_name: Option<&str>,
-) -> Result<String, UsageReportError> {
+    column: S,
+    title: S,
+    div_name: Option<S>,
+) -> Result<String, UsageReportError>
+where
+    S: AsRef<str>,
+{
     let rule_names: Vec<String> = lf
         .clone()
         .collect()?
@@ -90,7 +93,7 @@ pub fn plot_snakemake_rules(
             .collect()?;
         figure.add_trace(
             BoxPlot::new_xy(
-                rule_data[column]
+                rule_data[column.as_ref()]
                     .cast(&DataType::Float32)?
                     .as_series()
                     .ok_or(UsageReportError::NoneValueError {
@@ -124,8 +127,8 @@ pub fn plot_snakemake_rules(
     figure.set_layout(
         Layout::new()
             .update_menus(vec![update_menus])
-            .title(title)
-            .x_axis(Axis::new().title(column))
+            .title(title.as_ref())
+            .x_axis(Axis::new().title(column.as_ref()))
             .y_axis(
                 Axis::new()
                     .title("Nom de la règle")
@@ -137,7 +140,7 @@ pub fn plot_snakemake_rules(
             .height(400 + 40 * rule_names.len()),
     );
 
-    Ok(figure.to_inline_html(div_name))
+    Ok(figure.to_inline_html(div_name.as_ref().map(|d| d.as_ref())))
 }
 
 #[cfg(test)]

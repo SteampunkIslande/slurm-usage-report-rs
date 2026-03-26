@@ -276,11 +276,14 @@ pub fn get_color(v: minijinja::Value, col_name: &str) -> Option<String> {
     None
 }
 
-pub fn sacct_sanitizer(
-    file_name: &Path,
+pub fn sacct_sanitizer<P>(
+    file_name: P,
     col_count: Option<u32>,
     separator: Option<&str>,
-) -> Result<usize, UsageReportError> {
+) -> Result<usize, UsageReportError>
+where
+    P: AsRef<Path>,
+{
     let mut removed_lines = 0usize;
     let inp = InPlace::new(file_name).open()?;
 
@@ -307,10 +310,10 @@ pub fn sacct_sanitizer(
 /// # Returns
 /// * `Ok(())` on success
 /// * `Err(Box<dyn std::error::Error>)` on failure
-pub fn csv_to_parquet<P: AsRef<Path>>(
-    input_csv: P,
-    output_parquet: P,
-) -> Result<(), UsageReportError> {
+pub fn csv_to_parquet<P>(input_csv: P, output_parquet: P) -> Result<(), UsageReportError>
+where
+    P: AsRef<Path>,
+{
     // Define the schema for the SLURM sacct output
     let schema = Schema::from_iter(vec![
         Field::new(PlSmallStr::from_str("Account"), DataType::String),
@@ -447,11 +450,14 @@ pub fn csv_to_parquet<P: AsRef<Path>>(
     Ok(())
 }
 
-pub fn sink_parquet(lf: LazyFrame, path: &Path) -> Result<(), UsageReportError> {
+pub fn sink_parquet<P>(lf: LazyFrame, path: P) -> Result<(), UsageReportError>
+where
+    P: AsRef<Path>,
+{
     let _ = lf
         .sink(
             SinkDestination::File {
-                target: SinkTarget::Path(PlRefPath::try_from_path(path)?),
+                target: SinkTarget::Path(PlRefPath::try_from_path(path.as_ref())?),
             },
             FileWriteFormat::Parquet(Arc::new(ParquetWriteOptions::default())),
             UnifiedSinkArgs::default(),
@@ -460,19 +466,23 @@ pub fn sink_parquet(lf: LazyFrame, path: &Path) -> Result<(), UsageReportError> 
     Ok(())
 }
 
-pub fn merge_parquets(inputs: &[&Path], output: &Path) -> Result<(), UsageReportError> {
+pub fn merge_parquets<I, P>(inputs: I, output: P) -> Result<(), UsageReportError>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
     use duckdb::Connection;
 
     let conn: Connection = duckdb::Connection::open_in_memory()?;
     let parquet_list = inputs
-        .iter()
-        .map(|p| format!("'{}'", p.display()))
+        .into_iter()
+        .map(|p| format!("'{}'", p.as_ref().display()))
         .collect::<Vec<_>>()
         .join(",");
 
     let parquet_array = format!("[{}]", parquet_list);
 
-    let output_path = output.display();
+    let output_path = output.as_ref().display();
 
     let query = format!(
         r#"
