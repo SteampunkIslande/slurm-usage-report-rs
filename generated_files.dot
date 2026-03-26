@@ -1,0 +1,42 @@
+digraph post_run_files {
+    rankdir=TB;
+    node [shape=box, style="rounded,filled"];
+    
+    // Fichiers utilisateur (vert - demandés en output)
+    output_html [fillcolor="#90EE90", label="output_html\n(demandé par --output-html)"];
+    output_parquet [fillcolor="#90EE90", label="output_parquet\n(demandé par --output-parquet)"];
+    
+    // Fichiers intermédiaires (orange)
+    input_sizes [fillcolor="#FFA500", label="input_sizes.csv\n(intermédiaire, supprimé si erreur)"];
+    sacct_csv [fillcolor="#FFA500", label="sacct.csv\n(intermédiaire, supprimé si erreur)"];
+    sacct_parquet [fillcolor="#FFA500", label="sacct.parquet\n(intermédiaire, supprimé si erreur)"];
+    
+    // Inputs utilisateur
+    snakemake_logs [fillcolor="#ADD8E6", label="Snakemake log files\n(输入)"];
+    db [fillcolor="#ADD8E6", label="db/ parquet directory\n(optionnel)"];
+    
+    // Flux principal
+    snakemake_logs -> input_sizes [label="parse_snakemake_log_files"];
+    db -> input_parquets [label="dates → fichiers parquet"];
+    input_parquets -> sacct_parquet [label="merge_parquets"];
+    snakemake_logs -> slurm_ids [label="get_slurm_ids"];
+    slurm_ids -> sacct_get [label="sacct_get"];
+    sacct_get -> sacct_csv;
+    sacct_csv -> sacct_parquet [label="sanitizer + csv_to_parquet"];
+    slurm_ids -> sacct_parquet;
+    sacct_parquet -> output_html [label="generate_snakemake_efficiency_report"];
+    sacct_parquet -> output_parquet;
+    input_sizes -> output_html;
+    
+    // Légende
+    subgraph cluster_legend {
+        label="Légende";
+        rank=same;
+        legend1 [shape=box, fillcolor="#ADD8E6", label="Inputs utilisateur"];
+        legend2 [fillcolor="#90EE90", label="Outputs demandés"];
+        legend3 [fillcolor="#FFA500", label="Intermédiaires (supprimés si erreur)"];
+    }
+    
+    {rank=same; output_html output_parquet}
+    {rank=same; input_sizes sacct_csv sacct_parquet}
+}
