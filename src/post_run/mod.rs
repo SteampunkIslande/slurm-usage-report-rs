@@ -19,7 +19,7 @@ pub fn generate_snakemake_efficiency_report<I, P, S>(
     output_html: P,
     input_parquet: P,
     job_names: I,
-    output_parquet: Option<P>,
+    output_parquet: P,
     input_sizes_csv: Option<P>,
 ) -> Result<(), UsageReportError>
 where
@@ -58,11 +58,9 @@ where
         // Plus besoin du fichier temporaire, on remplace input_parquet par le fichier enrichi
         std::fs::rename(parquet_temp, input_parquet.as_ref())?;
 
+        let args = ScanArgsParquet::default();
         // input_parquet a été enrichi, on le réouvre sous forme de Layframe pour continuer l'extraction des données
-        lf = LazyFrame::scan_parquet(
-            PlRefPath::try_from_path(input_parquet.as_ref())?,
-            ScanArgsParquet::default(),
-        )?;
+        lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet.as_ref())?, args)?;
     }
 
     let mem_box_plot = plot_snakemake_rules(
@@ -249,9 +247,7 @@ where
         .open(output_html)?;
     write!(f, "{}", output)?;
 
-    if let Some(output_parquet) = output_parquet {
-        utils::sink_parquet(lf.clone(), output_parquet.as_ref())?;
-    }
+    utils::sink_parquet(lf.clone(), output_parquet.as_ref())?;
 
     Ok(())
 }

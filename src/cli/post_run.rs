@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{ArgAction::SetFalse, Parser};
 use slurm_usage_report_rs::{UsageReportError, sacct_get, snakemake_parse_log, utils};
 use std::{collections::HashSet, io::ErrorKind, path::PathBuf};
 
@@ -20,17 +20,13 @@ pub struct PostRunCmd {
     #[arg(short, long, num_args = 1..)]
     input: Vec<PathBuf>,
 
-    /// Chemin vers le rapport html d'utilisation du cluster pour le(s) exécutions de snakemake.
+    /// Chemin vers le dossier
     #[arg(long, short)]
-    output_html: PathBuf,
+    output_dir: Option<PathBuf>,
 
-    /// Chemin vers le fichier parquet de rapport d'utilisation
-    #[arg(long)]
-    output_parquet: Option<PathBuf>,
-
-    /// Conserver tous les fichiers de sortie intermédiaires, même en cas d'erreur.
-    #[arg(long, short)]
-    keep_all_outputs: bool,
+    /// Ne pas utiliser
+    #[arg(long, action = SetFalse)]
+    no_input_size_relative_metrics: bool,
 
     /// Chemin vers la base de données SACCT maison du cluster (dossier avec les fichiers parquet).
     ///
@@ -61,22 +57,36 @@ impl PostRunCmd {
         // Run checks before even thinking about running this CLI entry point.
         checks(self, cli)?;
 
+        let output_dir: PathBuf = self
+            .output_dir
+            .clone()
+            .unwrap_or(std::env::current_dir()?.join("usage-report"));
+        std::fs::create_dir_all(&output_dir)?;
+
+        let output_html: PathBuf = output_dir.join("usage-report.html");
+        let output_parquet: PathBuf = output_dir.join("usage-report.parquet");
+
         // List of slurm names to gather metrics for
         let slurm_job_names = snakemake_parse_log::get_slurm_ids(&self.input)?;
 
-        let input_sizes_path = PathBuf::from("input_sizes.csv");
-
-        // Get input_sizes. If we fail, we remove them
-        snakemake_parse_log::parse_snakemake_log_files(&self.input, &input_sizes_path)?;
-
-        // Path to the temporary intermediary sacct.csv. Will only be kept if we cannot convert it to parquet
-        let temp_sacct_csv = if self.db.is_none() {
-            Some(PathBuf::from("sacct.csv"))
+        // Could be confusing, but if no_input_size_relative_metrics is true, this means the user wants them (it's a negative flag)
+        let input_sizes_path = if self.no_input_size_relative_metrics {
+            let input_sizes_path = output_dir.join("input_sizes.csv");
+            // Get input_sizes. If we fail, we remove them
+            snakemake_parse_log::parse_snakemake_log_files(&self.input, &input_sizes_path)?;
+            Some(input_sizes_path)
         } else {
             None
         };
 
-        let temp_sacct_parquet = PathBuf::from("sacct.parquet");
+        // Path to the temporary intermediary sacct.csv. Will only be kept if we cannot convert it to parquet
+        let temp_sacct_csv = if self.db.is_none() {
+            Some(output_dir.join("sacct.csv"))
+        } else {
+            None
+        };
+
+        let temp_sacct_parquet = output_dir.join("sacct.parquet");
         // Raw parquet files that will be used to analyze slurm usage for snakemake runs given as input
         match &self.db {
             Some(db) => {
@@ -153,11 +163,11 @@ impl PostRunCmd {
         use slurm_usage_report_rs::post_run::generate_snakemake_efficiency_report;
 
         generate_snakemake_efficiency_report(
-            self.output_html.as_path(),
+            output_html.as_path(),
             temp_sacct_parquet.as_path(),
             slurm_job_names,
-            self.output_parquet.as_deref(),
-            Some(input_sizes_path.as_path()),
+            output_parquet.as_path(),
+            input_sizes_path.as_deref(),
         )?;
         Ok(())
     }
