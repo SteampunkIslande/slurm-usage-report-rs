@@ -14,12 +14,7 @@ use std::sync::LazyLock;
 
 pub static TEMPLATES_DIR: LazyLock<Dir> = LazyLock::new(|| include_dir!("assets/templates"));
 
-fn format_header(s: &str) -> String {
-    s.replace("_", "\n")
-}
-
 pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
-    use utils::get_color;
     let mut environment: Environment = Environment::new();
     environment.set_loader(move |name| {
         if let Some(file) = TEMPLATES_DIR.get_file(name) {
@@ -38,7 +33,7 @@ pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
 });
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use serde_json::json;
 
@@ -60,6 +55,11 @@ mod test {
             "efficiency_table_relative_mem": json!({"relative_mem_efficiency_col1":[100,50,150],"relative_mem_efficiency_col1":[100,50,150]}),
             "efficiency_table_relative_runtime": json!({"relative_runtime_efficiency_col1":[100,50,150],"relative_runtime_efficiency_col1":[100,50,150]}),
         })).unwrap();
+
+        assert_eq!(
+            output.as_bytes(),
+            include_bytes!("../assets/tests/expected_template.html")
+        );
         eprintln!("{}", output)
     }
 }

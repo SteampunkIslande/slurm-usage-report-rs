@@ -276,6 +276,10 @@ pub fn get_color(v: minijinja::Value, col_name: &str) -> Option<String> {
     None
 }
 
+pub fn format_header(s: &str) -> String {
+    s.replace("_", "\n")
+}
+
 pub fn sacct_sanitizer<P>(
     file_name: P,
     col_count: Option<u32>,
