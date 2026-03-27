@@ -160,6 +160,8 @@
             {% else %}
             {% if cell_value is number %}
             {{ cell_value | round(3) }}
+            {% elif cell_value is none %}
+            <span style="font-style:italic; color: red;">NULL</span>
             {% else %}
             {{ cell_value }}
             {% endif %}
@@ -254,7 +256,7 @@
   {{ render_table(efficiency_table_relative_mem) }}
 
   <h2>RAM utilisée par Mo d'entrée (boxplot)</h2>
-  <p>{{ relative_mem_box_plot | safe }}</p>
+  <div>{{ relative_mem_box_plot | safe }}</div>
   {% else %}
   <p style="font-weight: bold;">Les tailles des fichiers d'entrée n'ont malheureusement pas pu être récupérées pour ce
     run.</p>

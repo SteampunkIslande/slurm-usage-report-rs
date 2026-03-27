@@ -114,15 +114,6 @@ where
         &(lf_agg
             .clone()
             .select(&[
-                col("rule_name"),
-                col("MemEfficiencyPercent_mean"),
-                col("MemEfficiencyPercent_median"),
-                col("MemEfficiencyPercent_std"),
-                col("MemEfficiencyPercent_min"),
-                col("MemEfficiencyPercent_max"),
-            ])
-            .sort(["rule_name"], SortMultipleOptions::default())
-            .select(&[
                 col("rule_name").alias("Nom de la règle"),
                 col("MemEfficiencyPercent_mean").alias("Efficacité mémoire moyenne"),
                 col("MemEfficiencyPercent_median").alias("Efficacité mémoire médiane"),
@@ -130,20 +121,12 @@ where
                 col("MemEfficiencyPercent_min").alias("Efficacité mémoire minimum"),
                 col("MemEfficiencyPercent_max").alias("Efficacité mémoire maximum"),
             ])
+            .sort(["Nom de la règle"], SortMultipleOptions::default())
             .collect()?),
     )?;
     let efficiency_table_cpu = utils::df_to_columnar_json(
         &(lf_agg
             .clone()
-            .select(&[
-                col("rule_name"),
-                col("CPUEfficiencyPercent_mean"),
-                col("CPUEfficiencyPercent_median"),
-                col("CPUEfficiencyPercent_std"),
-                col("CPUEfficiencyPercent_min"),
-                col("CPUEfficiencyPercent_max"),
-            ])
-            .sort(["rule_name"], SortMultipleOptions::default())
             .select(&[
                 col("rule_name").alias("Nom de la règle"),
                 col("CPUEfficiencyPercent_mean").alias("Efficacité CPU moyenne"),
@@ -152,20 +135,12 @@ where
                 col("CPUEfficiencyPercent_min").alias("Efficacité CPU minimum"),
                 col("CPUEfficiencyPercent_max").alias("Efficacité CPU maximum"),
             ])
+            .sort(["Nom de la règle"], SortMultipleOptions::default())
             .collect()?),
     )?;
     let efficiency_table_runtime = utils::df_to_columnar_json(
         &(lf_agg
             .clone()
-            .select(&[
-                col("rule_name"),
-                col("ElapsedRaw_mean"),
-                col("ElapsedRaw_median"),
-                col("ElapsedRaw_std"),
-                col("ElapsedRaw_min"),
-                col("ElapsedRaw_max"),
-            ])
-            .sort(["rule_name"], SortMultipleOptions::default())
             .select(&[
                 col("rule_name").alias("Nom de la règle"),
                 col("ElapsedRaw_mean").alias("Durée moyenne"),
@@ -174,21 +149,13 @@ where
                 col("ElapsedRaw_min").alias("Durée minimum"),
                 col("ElapsedRaw_max").alias("Durée maximum"),
             ])
+            .sort(["Nom de la règle"], SortMultipleOptions::default())
             .collect()?),
     )?;
     let efficiency_table_relative_mem = if input_sizes_csv.is_some() {
         Some(utils::df_to_columnar_json(
             &(lf_agg
                 .clone()
-                .select(&[
-                    col("rule_name"),
-                    col("UsedRAMPerMo_mean"),
-                    col("UsedRAMPerMo_median"),
-                    col("UsedRAMPerMo_std"),
-                    col("UsedRAMPerMo_min"),
-                    col("UsedRAMPerMo_max"),
-                ])
-                .sort(["rule_name"], SortMultipleOptions::default())
                 .select(&[
                     col("rule_name").alias("Nom de la règle"),
                     col("UsedRAMPerMo_mean").alias("RAM utilisée par Mo (moyenne)"),
@@ -197,6 +164,7 @@ where
                     col("UsedRAMPerMo_min").alias("RAM utilisée par Mo (minimum)"),
                     col("UsedRAMPerMo_max").alias("RAM utilisée par Mo (maximum)"),
                 ])
+                .sort(["Nom de la règle"], SortMultipleOptions::default())
                 .collect()?),
         )?)
     } else {
@@ -207,15 +175,6 @@ where
             &(lf_agg
                 .clone()
                 .select(&[
-                    col("rule_name"),
-                    col("MinPerMo_mean"),
-                    col("MinPerMo_median"),
-                    col("MinPerMo_std"),
-                    col("MinPerMo_min"),
-                    col("MinPerMo_max"),
-                ])
-                .sort(["rule_name"], SortMultipleOptions::default())
-                .select(&[
                     col("rule_name").alias("Nom de la règle"),
                     col("MinPerMo_mean").alias("Minutes par Mo (moyenne)"),
                     col("MinPerMo_median").alias("Minutes par Mo (médiane)"),
@@ -223,6 +182,7 @@ where
                     col("MinPerMo_min").alias("Minutes par Mo (minimum)"),
                     col("MinPerMo_max").alias("Minutes par Mo (maximum)"),
                 ])
+                .sort(["Nom de la règle"], SortMultipleOptions::default())
                 .collect()?),
         )?)
     } else {

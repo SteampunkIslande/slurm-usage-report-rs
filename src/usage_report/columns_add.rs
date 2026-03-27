@@ -526,7 +526,6 @@ where
     P: AsRef<Path>,
 {
     let intermediary_file = input_parquet.as_ref().with_extension("tmp.parquet");
-    eprintln!("{}", intermediary_file.display());
 
     if intermediary_file.exists()
         || is_same_file(&intermediary_file, &input_parquet).unwrap_or(false)
