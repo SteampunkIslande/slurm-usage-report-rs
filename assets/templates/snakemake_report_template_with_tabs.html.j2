@@ -1,0 +1,15 @@
+{% macro render_tabs(tabs) %}
+<div class="tabs-container">
+    <div class="tabs-block">
+        <div class="tabs">
+            {% for tabname in tabs %}
+            <input type="radio" name="tabs" id="{{ tabname }}" checked="checked" />
+            <label for="{{ tabname }}">{{ tabs[tabname].title }}</label>
+            <div class="tab">
+                {{ content }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
