@@ -18,6 +18,7 @@ use std::path::Path;
 
 use duckdb::Connection;
 use polars::prelude::*;
+use same_file::is_same_file;
 
 use crate::UsageReportError;
 
@@ -524,7 +525,17 @@ pub fn add_metrics_relative_to_input_size_inplace<P>(
 where
     P: AsRef<Path>,
 {
-    let intermediary_file = input_parquet.as_ref().with_extension(".tmp.parquet");
+    let intermediary_file = input_parquet.as_ref().with_extension("tmp.parquet");
+    eprintln!("{}", intermediary_file.display());
+
+    if intermediary_file.exists()
+        || is_same_file(&intermediary_file, &input_parquet).unwrap_or(false)
+    {
+        return Err(UsageReportError::SameFile(
+            intermediary_file.display().to_string(),
+            input_parquet.as_ref().display().to_string(),
+        ));
+    }
 
     let conn: Connection = duckdb::Connection::open_in_memory()?;
     let query = format!(
@@ -547,7 +558,7 @@ where
 
     conn.execute(&query, [])?;
 
-    std::fs::rename(&intermediary_file, input_parquet)?;
+    std::fs::rename(&intermediary_file, &input_parquet)?;
 
     Ok(())
 }

@@ -27,4 +27,6 @@ pub enum UsageReportError {
     EmptyFile { filename: String, message: String },
     #[error("Empty list: {} is empty.\n {}",.listname,.message)]
     EmptyList { listname: String, message: String },
+    #[error("Files {0} and {1} are the same, cannot overwrite!")]
+    SameFile(String, String),
 }

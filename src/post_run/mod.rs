@@ -1,5 +1,6 @@
 pub mod snakemake_rules_plot;
 
+use same_file::is_same_file;
 pub use snakemake_rules_plot::*;
 
 pub mod snakemake_parse_log;
@@ -32,8 +33,11 @@ where
     use serde_json::json;
     use std::io::Write;
 
+    // On ne doit pas toucher à input_parquet, c'est le parquet brut, directement issu de SACCT (avec tous ses éventuels doublons, et toutes les infos inhérentes aux jobs et à leurs jobsteps).
+    std::fs::copy(input_parquet.as_ref(), output_parquet.as_ref())?;
+
     let args = ScanArgsParquet::default();
-    let mut lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet.as_ref())?, args)?;
+    let mut lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(output_parquet.as_ref())?, args)?;
 
     lf = generic_report(lf)?;
     // Filter by job name, only after the aggregate is done
@@ -48,7 +52,7 @@ where
 
     if let Some(input_sizes) = input_sizes_csv.as_ref() {
         // Sauvegarder le parquet en cours de lecture par le lazyframe, car on s'apprête à écrire dedans
-        let parquet_temp = input_parquet.as_ref().with_extension("tmp.parquet");
+        let parquet_temp = output_parquet.as_ref().with_extension("tmp.parquet");
         sink_parquet(lf, &parquet_temp)?;
 
         // Cette fonction est `in-place`, c'est à dire qu'elle est conçue pour prendre le même chemin en entrée et en sortie
@@ -56,11 +60,11 @@ where
         add_metrics_relative_to_input_size_inplace(parquet_temp.as_path(), input_sizes.as_ref())?;
 
         // Plus besoin du fichier temporaire, on remplace input_parquet par le fichier enrichi
-        std::fs::rename(parquet_temp, input_parquet.as_ref())?;
+        std::fs::rename(parquet_temp, output_parquet.as_ref())?;
 
         let args = ScanArgsParquet::default();
         // input_parquet a été enrichi, on le réouvre sous forme de Layframe pour continuer l'extraction des données
-        lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(input_parquet.as_ref())?, args)?;
+        lf = LazyFrame::scan_parquet(PlRefPath::try_from_path(output_parquet.as_ref())?, args)?;
     }
 
     let mem_box_plot = plot_snakemake_rules(
@@ -247,7 +251,15 @@ where
         .open(output_html)?;
     write!(f, "{}", output)?;
 
-    utils::sink_parquet(lf.clone(), output_parquet.as_ref())?;
+    let parquet_temp = output_parquet.as_ref().with_extension("tmp.parquet");
+    if parquet_temp.exists() || is_same_file(&parquet_temp, &output_parquet).unwrap_or(false) {
+        return Err(UsageReportError::SameFile(
+            parquet_temp.display().to_string(),
+            output_parquet.as_ref().display().to_string(),
+        ));
+    }
+    utils::sink_parquet(lf.clone(), parquet_temp.as_path())?;
+    std::fs::rename(parquet_temp.as_path(), output_parquet.as_ref())?;
 
     Ok(())
 }
