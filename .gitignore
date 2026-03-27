@@ -1,6 +1,6 @@
 /target
-*.log
-*.parquet
-*.xlsx
-*.html
-*.csv
+/*.log
+/*.parquet
+/*.xlsx
+/*.html
+/*.csv
