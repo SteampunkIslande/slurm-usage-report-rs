@@ -25,14 +25,18 @@
     html,
     body {
       height: 100%;
+      padding: 2rem;
     }
 
     body {
       font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
       background: var(--bg);
       color: #0b1724;
-      margin: 24px;
+      margin-left: auto;
+      margin-right: auto;
       line-height: 1.5;
+      width: 80%;
+      max-width: 1000px;
     }
 
     h1 {
@@ -99,21 +103,6 @@
       font-weight: 600;
     }
 
-    /* Small screens */
-    @media (max-width:640px) {
-      body {
-        margin: 12px;
-      }
-
-      .dataframe table {
-        min-width: 480px;
-      }
-
-      .plot {
-        overflow: auto;
-      }
-    }
-
     /* Plot container spacing */
     .plot {
       margin: 8px 0 24px;
@@ -136,7 +125,7 @@
  * Tabs Container
  */
     .tabs-container {
-      padding: 2rem;
+      padding: 0;
     }
 
     /**
@@ -171,10 +160,8 @@
       font-size: 1.2rem;
       font-weight: 700;
       transition: background-color ease 0.3s;
-    }
-
-    .tabs label .material-icons {
-      margin-right: 0.3rem;
+      order: 1;
+      width: auto;
     }
 
     .tabs .tab {
@@ -186,6 +173,7 @@
       color: #000;
       background-color: #fff;
       box-shadow: 0 10px 10px rgba(0, 0, 0, 0.4);
+      order: 9;
     }
 
     .tabs .tab>*:not(:last-child) {
@@ -200,6 +188,7 @@
       background-color: #fff;
       color: #0067b8;
       border-top: 4px solid #0067b8;
+      border-bottom: none;
       box-shadow: 0 10px 10px rgba(0, 0, 0, 0.4);
     }
 
@@ -268,6 +257,7 @@
     d'exécution.
   </p>
 
+  {% macro render_mem_section() %}
   <h2>Efficacité mémoire (%)</h2>
   <p>
     Cette métrique correspond au rapport entre la mémoire réellement utilisée et la mémoire demandée.
@@ -344,7 +334,9 @@
   <p style="font-weight: bold;">Les tailles des fichiers d'entrée n'ont malheureusement pas pu être récupérées pour ce
     run.</p>
   {% endif %}
+  {% endmacro %}
 
+  {% macro render_cpu_section() %}
   <h2>Efficacité CPU (%)</h2>
   <p>
     Cette métrique correspond à :
@@ -409,6 +401,9 @@
   <div>
     {{ cpu_box_plot | safe }}
   </div>
+  {% endmacro %}
+
+  {% macro render_runtime_section() %}
   <h2>Durée d'exécution (en secondes)</h2>
   <p>
     La table ci-dessous mesure, pour chaque règle Snakemake, la durée d'exécution totale en secondes.
@@ -497,6 +492,13 @@
   {% else %}
   <p style="font-weight: bold;">Les tailles des fichiers d'entrée n'ont malheureusement pas pu être récupérées pour ce
     run.</p>
+  {% endif %}
+  {% endmacro %}
+
+  {% if use_tabs %}
+  {% include "snakemake_report_template_with_tabs.html.j2" %}
+  {% else %}
+  {% include "snakemake_report_template_without_tabs.html.j2" %}
   {% endif %}
 
 </body>

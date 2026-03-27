@@ -4,7 +4,7 @@
 
 # Présentation HTML
 
-- [ ] Laisser à l'utilisateur le choix d'avoir ou non des onglets dans son rapport HTML.
+- [x] Laisser à l'utilisateur le choix d'avoir ou non des onglets dans son rapport HTML.
 - [x] Laisser à l'utilisateur le choix de ne pas utiliser les métriques relatives à la taille du fichier d'entrée.
 
 # CLI

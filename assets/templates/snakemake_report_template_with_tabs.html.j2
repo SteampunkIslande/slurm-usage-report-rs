@@ -1,15 +1,21 @@
-{% macro render_tabs(tabs) %}
 <div class="tabs-container">
     <div class="tabs-block">
         <div class="tabs">
-            {% for tabname in tabs %}
-            <input type="radio" name="tabs" id="{{ tabname }}" checked="checked" />
-            <label for="{{ tabname }}">{{ tabs[tabname].title }}</label>
+            <input type="radio" name="tabs" id="tab-mem" checked />
+            <label for="tab-mem">Efficacité mémoire</label>
             <div class="tab">
-                {{ content }}
+                {{ render_mem_section() }}
             </div>
-            {% endfor %}
+            <input type="radio" name="tabs" id="tab-cpu" />
+            <label for="tab-cpu">Efficacité CPU</label>
+            <div class="tab">
+                {{ render_cpu_section() }}
+            </div>
+            <input type="radio" name="tabs" id="tab-runtime" />
+            <label for="tab-runtime">Durée d'exécution</label>
+            <div class="tab">
+                {{ render_runtime_section() }}
+            </div>
         </div>
     </div>
 </div>
-{% endmacro %}

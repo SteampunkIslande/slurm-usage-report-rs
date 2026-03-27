@@ -22,6 +22,7 @@ pub fn generate_snakemake_efficiency_report<I, P, S>(
     job_names: I,
     output_parquet: P,
     input_sizes_csv: Option<P>,
+    use_tabs: bool,
 ) -> Result<(), UsageReportError>
 where
     I: IntoIterator<Item = S>,
@@ -203,6 +204,7 @@ where
             "efficiency_table_runtime": efficiency_table_runtime,
             "efficiency_table_relative_mem": efficiency_table_relative_mem,
             "efficiency_table_relative_runtime": efficiency_table_relative_runtime,
+            "use_tabs": use_tabs
         }
     ))?;
     let mut f = OpenOptions::new()

@@ -24,9 +24,12 @@ pub struct PostRunCmd {
     #[arg(long, short)]
     output_dir: Option<PathBuf>,
 
-    /// Ne pas utiliser
+    /// Ne pas ajouter les métriques relatives aux tailles des fichiers d'entrée
     #[arg(long, action = SetFalse)]
     no_input_size_relative_metrics: bool,
+
+    #[arg(long, action = SetFalse)]
+    no_tabs: bool,
 
     /// Chemin vers la base de données SACCT maison du cluster (dossier avec les fichiers parquet).
     ///
@@ -168,6 +171,7 @@ impl PostRunCmd {
             slurm_job_names,
             output_parquet.as_path(),
             input_sizes_path.as_deref(),
+            self.no_tabs,
         )?;
         Ok(())
     }
