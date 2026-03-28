@@ -36,6 +36,12 @@ pub struct PostRunCmd {
     /// Permet de contourner sacct en cherchant directement les données dans les fichiers parquet
     #[arg(short, long)]
     db: Option<PathBuf>,
+
+    /// Force l'écriture du dossier de sortie si ce dernier existe déjà.
+    ///
+    /// Attention, cela supprime le dossier déjà existant avant même de démarrer.
+    #[arg(short, long)]
+    force: bool,
 }
 
 fn checks(command: &PostRunCmd, _cli: &Cli) -> Result<(), UsageReportError> {
@@ -52,6 +58,17 @@ fn checks(command: &PostRunCmd, _cli: &Cli) -> Result<(), UsageReportError> {
             )));
         }
     }
+    if let Some(outdir) = &command.output_dir
+        && outdir.exists()
+        && !command.force
+    {
+        return Err(UsageReportError::IOError(std::io::Error::new(
+            ErrorKind::AlreadyExists,
+            format!(
+                "Le dossier de sortie existe déjà. Pour forcer l'écriture dans ce dossier, utilisez l'option -f/--force"
+            ),
+        )));
+    }
     Ok(())
 }
 
@@ -64,6 +81,10 @@ impl PostRunCmd {
             .output_dir
             .clone()
             .unwrap_or(std::env::current_dir()?.join("usage-report"));
+
+        if output_dir.exists() && self.force {
+            std::fs::remove_dir_all(&output_dir)?;
+        }
         std::fs::create_dir_all(&output_dir)?;
 
         let output_html: PathBuf = output_dir.join("usage-report.html");
