@@ -1,11 +1,14 @@
-pub mod auto_complete;
+mod auto_complete;
 use auto_complete::*;
 
-pub mod post_run;
-pub use post_run::*;
+mod post_run;
+use post_run::*;
 
-pub mod csv_to_parquet;
-pub use csv_to_parquet::*;
+mod csv_to_parquet;
+use csv_to_parquet::*;
+
+mod daily_efficiency_report;
+use daily_efficiency_report::*;
 
 use clap::{Parser, Subcommand};
 
@@ -14,6 +17,7 @@ pub enum Commands {
     PostRunCmd(PostRunCmd),
     Autocomplete(AutoComplete),
     CsvToParquet(CsvToParquet),
+    DailyEfficiency(DailyEfficiency),
 }
 
 #[derive(Debug, Parser)]

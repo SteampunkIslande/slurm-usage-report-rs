@@ -10,7 +10,7 @@
 # CLI
 
 - [x] Supprimer toutes les options inutiles de la CLI
-- [ ] Ajouter l'option --force pour supprimer le dossier de sortie s'il existe déjà.
+- [x] Ajouter l'option --force pour supprimer le dossier de sortie s'il existe déjà.
 
 # Tests
 - [ ] Tester, toujours tester, améliorer la couverture

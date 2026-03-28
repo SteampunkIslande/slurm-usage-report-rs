@@ -15,6 +15,9 @@ fn main() -> Result<(), UsageReportError> {
         Commands::CsvToParquet(csv_to_parquet) => {
             csv_to_parquet.run(&cli)?;
         }
+        Commands::DailyEfficiency(daily_efficiency) => {
+            daily_efficiency.run(&cli)?;
+        }
     }
     Ok(())
 }

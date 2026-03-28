@@ -5,7 +5,7 @@ use std::{collections::HashSet, io::ErrorKind, path::PathBuf};
 use crate::cli::Cli;
 
 const LONG_ABOUT: &str = concat!(
-    "Script post-run pour générer un rapport d'usage Slurm à partir des logs de Snakemake.\n\n",
+    "Programme post-run pour générer un rapport d'usage Slurm à partir des logs de Snakemake.\n\n",
     "Possibilité de spécifier plusieurs fichiers de log (ex: .snakemake/log/xxx.log) pour consolider les métriques\n",
     "à partir de plusieurs runs de Snakemake mais avec le même pipeline."
 );
