@@ -555,6 +555,36 @@ pub fn df_to_columnar_json(df: &DataFrame) -> Result<Value, UsageReportError> {
     Ok(Value::Object(map))
 }
 
+pub fn format_duration(v: minijinja::Value, _state: &minijinja::State) -> minijinja::Value {
+    let seconds = if let Ok(f) = f64::try_from(v.clone()) {
+        f
+    } else if let Some(s) = v.as_str() {
+        if let Ok(f) = s.parse::<f64>() {
+            f
+        } else {
+            return minijinja::Value::from("N/A");
+        }
+    } else {
+        return minijinja::Value::from("N/A");
+    };
+
+    if seconds < 0.0 {
+        return minijinja::Value::from("N/A");
+    }
+
+    let hours = (seconds / 3600.0) as i64;
+    let minutes = ((seconds % 3600.0) / 60.0) as i64;
+    let secs = (seconds % 60.0) as i64;
+
+    if hours > 0 {
+        minijinja::Value::from(format!("{}h {}m {}s", hours, minutes, secs))
+    } else if minutes > 0 {
+        minijinja::Value::from(format!("{}m {}s", minutes, secs))
+    } else {
+        minijinja::Value::from(format!("{}s", secs))
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

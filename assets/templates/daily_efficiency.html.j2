@@ -106,87 +106,87 @@
             </tr>
             <tr>
                 <td>Total CPU (heures)</td>
-                <td class="metric-value">{{ "%.2f"|format(global_metrics.get("CPU.Heures", 0) or 0) }} h</td>
+                <td class="metric-value">{{ "%.2f"|format(global_metrics["CPU.Heures"] | default(0)) }} h</td>
             </tr>
             <tr>
                 <td>Pourcentage d'utilisation CPU</td>
-                <td class="metric-value percentage">{{ "%.2f"|format(global_metrics.get("Pourcentage d'utilisation CPU",
-                    0) or 0) }} %</td>
+                <td class="metric-value percentage">{{ "%.2f"|format(global_metrics["Pourcentage d'utilisation CPU"] |
+                    default(0)) }} %</td>
             </tr>
             <tr>
                 <td>Utilisation mémoire (GB.secondes)</td>
-                <td class="metric-value">{{ "%.2f"|format(global_metrics.get("GB.Secondes", 0) or 0) }}</td>
+                <td class="metric-value">{{ "%.2f"|format(global_metrics["GB.Secondes"] | default(0)) }}</td>
             </tr>
             <tr>
                 <td>Taux d'occupation de la RAM</td>
-                <td class="metric-value percentage">{{ "%.2f"|format(global_metrics.get("Taux d'occupation de la RAM",
-                    0) or 0) }} %</td>
+                <td class="metric-value percentage">{{ "%.2f"|format(global_metrics["Taux d'occupation de la RAM"] |
+                    default(0)) }} %</td>
             </tr>
             <tr>
                 <td>Temps d'attente moyen en queue</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Temps d'attente moyen en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Temps d'attente moyen en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Temps d'attente médian en queue</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Temps d'attente médian en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Temps d'attente médian en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Temps d'attente minimum en queue</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Temps d'attente minimum en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Temps d'attente minimum en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Temps d'attente maximum en queue</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Temps d'attente maximum en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Temps d'attente maximum en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Jobs terminés avec succès</td>
-                <td class="metric-value"><span style="color: green;">{{ global_metrics.get("Jobs terminés avec succès")
+                <td class="metric-value"><span style="color: green;">{{ global_metrics["Jobs terminés avec succès"]
                         }}</span></td>
             </tr>
             <tr>
                 <td>Jobs échoués</td>
-                <td class="metric-value"><span style="color: red;">{{ global_metrics.get("Jobs échoués") }}</span></td>
+                <td class="metric-value"><span style="color: red;">{{ global_metrics["Jobs échoués"] }}</span></td>
             </tr>
             <tr>
                 <td>Jobs préemptés</td>
-                <td class="metric-value"><span style="color: orange;">{{ global_metrics.get("Jobs préemptés") }}</span>
+                <td class="metric-value"><span style="color: orange;">{{ global_metrics["Jobs préemptés"] }}</span>
                 </td>
             </tr>
             <tr>
                 <td>Jobs soumis</td>
-                <td class="metric-value">{{ global_metrics.get("Jobs soumis") }}</td>
+                <td class="metric-value">{{ global_metrics["Jobs soumis"] }}</td>
             </tr>
             <tr>
                 <td>Jobs démarrés</td>
-                <td class="metric-value">{{ global_metrics.get("Jobs démarrés") }}</td>
+                <td class="metric-value">{{ global_metrics["Jobs démarrés"] }}</td>
             </tr>
             <tr>
                 <td>Jobs terminés</td>
-                <td class="metric-value">{{ global_metrics.get("Jobs terminés") }}</td>
+                <td class="metric-value">{{ global_metrics["Jobs terminés"] }}</td>
             </tr>
             <tr>
                 <td>Durée moyenne d'exécution</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Durée moyenne d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Durée moyenne d'exécution (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Durée médiane d'exécution</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Durée médiane d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Durée médiane d'exécution (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Durée minimum d'exécution</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Durée minimum d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Durée minimum d'exécution (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Durée maximum d'exécution</td>
-                <td class="metric-value time-value">{{ global_metrics.get("Durée maximum d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ global_metrics["Durée maximum d'exécution (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
         </table>
     </div>
@@ -198,7 +198,8 @@
             Les métriques sont également ventilées par QOS (Quality of Service), ce qui permet d'identifier les classes
             de jobs les plus consommatrices de ressources ou les plus sujettes à des temps d'attente en queue élevés.
         </p>
-        {% for qos_name, qos_data in qos_metrics.items() %}
+        {% for qos_name in qos_metrics %}
+        {% set qos_data = qos_metrics[qos_name] %}
         <h4>QOS: {{ qos_name }}</h4>
         <table>
             <tr>
@@ -207,87 +208,87 @@
             </tr>
             <tr>
                 <td>CPU (heures)</td>
-                <td class="metric-value">{{ "%.2f"|format(qos_data.get("CPU.Heures", 0) or 0) }} h</td>
+                <td class="metric-value">{{ "%.2f"|format(qos_data["CPU.Heures"] | default(0)) }} h</td>
             </tr>
             <tr>
                 <td>Pourcentage d'utilisation CPU</td>
-                <td class="metric-value percentage">{{ "%.2f"|format(qos_data.get("Pourcentage d'utilisation CPU", 0) or
-                    0) }} %</td>
+                <td class="metric-value percentage">{{ "%.2f"|format(qos_data["Pourcentage d'utilisation CPU"] |
+                    default(0)) }} %</td>
             </tr>
             <tr>
                 <td>Utilisation mémoire (GB.secondes)</td>
-                <td class="metric-value">{{ "%.2f"|format(qos_data.get("GB.Secondes", 0) or 0) }}</td>
+                <td class="metric-value">{{ "%.2f"|format(qos_data["GB.Secondes"] | default(0)) }}</td>
             </tr>
             <tr>
                 <td>Taux d'occupation de la RAM</td>
-                <td class="metric-value percentage">{{ "%.2f"|format(qos_data.get("Taux d'occupation de la RAM", 0) or
-                    0) }} %</td>
+                <td class="metric-value percentage">{{ "%.2f"|format(qos_data["Taux d'occupation de la RAM"] |
+                    default(0)) }} %</td>
             </tr>
             <tr>
                 <td>Temps d'attente moyen en queue</td>
-                <td class="metric-value time-value">{{ qos_data.get("Temps d'attente moyen en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Temps d'attente moyen en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Temps d'attente médian en queue</td>
-                <td class="metric-value time-value">{{ qos_data.get("Temps d'attente médian en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Temps d'attente médian en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Temps d'attente minimum en queue</td>
-                <td class="metric-value time-value">{{ qos_data.get("Temps d'attente minimum en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Temps d'attente minimum en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Temps d'attente maximum en queue</td>
-                <td class="metric-value time-value">{{ qos_data.get("Temps d'attente maximum en queue (secondes)",
-                    0)|format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Temps d'attente maximum en queue (secondes)"] |
+                    default(0) | format_duration }}</td>
             </tr>
             <tr>
                 <td>Jobs terminés avec succès</td>
-                <td class="metric-value"><span style="color: green;">{{ qos_data.get("Jobs terminés avec succès")
-                        }}</span></td>
+                <td class="metric-value"><span style="color: green;">{{ qos_data["Jobs terminés avec succès"] }}</span>
+                </td>
             </tr>
             <tr>
                 <td>Jobs échoués</td>
-                <td class="metric-value"><span style="color: red;">{{ qos_data.get("Jobs échoués") }}</span></td>
+                <td class="metric-value"><span style="color: red;">{{ qos_data["Jobs échoués"] }}</span></td>
             </tr>
             <tr>
                 <td>Jobs préemptés</td>
-                <td class="metric-value"><span style="color: orange;">{{ qos_data.get("Jobs préemptés") }}</span>
+                <td class="metric-value"><span style="color: orange;">{{ qos_data["Jobs préemptés"] }}</span>
                 </td>
             </tr>
             <tr>
                 <td>Jobs soumis</td>
-                <td class="metric-value">{{ qos_data.get("Jobs soumis") }}</td>
+                <td class="metric-value">{{ qos_data["Jobs soumis"] }}</td>
             </tr>
             <tr>
                 <td>Jobs démarrés</td>
-                <td class="metric-value">{{ qos_data.get("Jobs démarrés") }}</td>
+                <td class="metric-value">{{ qos_data["Jobs démarrés"] }}</td>
             </tr>
             <tr>
                 <td>Jobs terminés</td>
-                <td class="metric-value">{{ qos_data.get("Jobs terminés") }}</td>
+                <td class="metric-value">{{ qos_data["Jobs terminés"] }}</td>
             </tr>
             <tr>
                 <td>Durée moyenne d'exécution</td>
-                <td class="metric-value time-value">{{ qos_data.get("Durée moyenne d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Durée moyenne d'exécution (secondes)"] | default(0) |
+                    format_duration }}</td>
             </tr>
             <tr>
                 <td>Durée médiane d'exécution</td>
-                <td class="metric-value time-value">{{ qos_data.get("Durée médiane d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Durée médiane d'exécution (secondes)"] | default(0) |
+                    format_duration }}</td>
             </tr>
             <tr>
                 <td>Durée minimum d'exécution</td>
-                <td class="metric-value time-value">{{ qos_data.get("Durée minimum d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Durée minimum d'exécution (secondes)"] | default(0) |
+                    format_duration }}</td>
             </tr>
             <tr>
                 <td>Durée maximum d'exécution</td>
-                <td class="metric-value time-value">{{ qos_data.get("Durée maximum d'exécution (secondes)",
-                    0) | format_duration }}</td>
+                <td class="metric-value time-value">{{ qos_data["Durée maximum d'exécution (secondes)"] | default(0) |
+                    format_duration }}</td>
             </tr>
         </table>
         {% endfor %}

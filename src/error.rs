@@ -29,4 +29,6 @@ pub enum UsageReportError {
     EmptyList { listname: String, message: String },
     #[error("Files {0} and {1} are the same, cannot overwrite!")]
     SameFile(String, String),
+    #[error(transparent)]
+    JsonError(#[from] serde_json::Error),
 }

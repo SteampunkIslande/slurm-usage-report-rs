@@ -1,8 +1,10 @@
+pub mod daily_efficiency;
 pub mod error;
 pub mod post_run;
 pub mod usage_report;
 pub mod utils;
 
+pub use daily_efficiency::*;
 pub use error::*;
 pub use post_run::*;
 pub use usage_report::*;
@@ -29,6 +31,7 @@ pub static JINJA_ENV: LazyLock<Environment> = LazyLock::new(|| {
     });
     environment.add_filter("format_header", format_header);
     environment.add_filter("get_color", get_color);
+    environment.add_filter("format_duration", format_duration);
     environment
 });
 
