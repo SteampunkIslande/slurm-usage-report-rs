@@ -585,6 +585,24 @@ pub fn format_duration(v: minijinja::Value, _state: &minijinja::State) -> miniji
     }
 }
 
+pub fn datetime_conversion_options() -> StrptimeOptions {
+    StrptimeOptions {
+        format: Some("%Y-%m-%dT%H:%M:%S".into()),
+        strict: false,
+        exact: false,
+        cache: true,
+    }
+}
+
+pub fn date_conversion_options() -> StrptimeOptions {
+    StrptimeOptions {
+        format: Some("%Y-%m-%d".into()),
+        strict: false,
+        exact: false,
+        cache: true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

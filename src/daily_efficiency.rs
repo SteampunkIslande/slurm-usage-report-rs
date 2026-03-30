@@ -8,7 +8,7 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     JINJA_ENV, UsageReportError, add_daily_duration, add_job_duration_cols, add_wait_time_cols,
-    generic_report,
+    date_conversion_options, datetime_conversion_options, generic_report,
 };
 
 fn anyvalue_to_f64(v: &AnyValue) -> f64 {
@@ -87,13 +87,10 @@ pub fn compute_daily_metrics(
             .filter(
                 col("Submit")
                     .str()
-                    .to_datetime(None, None, StrptimeOptions::default(), lit("raise"))
+                    .to_datetime(None, None, datetime_conversion_options(), lit("raise"))
                     .dt()
                     .date()
-                    .eq(lit(date).str().to_date(StrptimeOptions {
-                        format: Some(PlSmallStr::from_str("%Y-%m-%d")),
-                        ..Default::default()
-                    })),
+                    .eq(lit(date).str().to_date(date_conversion_options())),
             )
             .count()
             .alias("Jobs soumis"),
@@ -101,13 +98,10 @@ pub fn compute_daily_metrics(
             .filter(
                 col("Start")
                     .str()
-                    .to_datetime(None, None, StrptimeOptions::default(), lit("raise"))
+                    .to_datetime(None, None, datetime_conversion_options(), lit("raise"))
                     .dt()
                     .date()
-                    .eq(lit(date).str().to_date(StrptimeOptions {
-                        format: Some(PlSmallStr::from_str("%Y-%m-%d")),
-                        ..Default::default()
-                    })),
+                    .eq(lit(date).str().to_date(date_conversion_options())),
             )
             .count()
             .alias("Jobs démarrés"),
@@ -115,13 +109,10 @@ pub fn compute_daily_metrics(
             .filter(
                 col("End")
                     .str()
-                    .to_datetime(None, None, StrptimeOptions::default(), lit("raise"))
+                    .to_datetime(None, None, datetime_conversion_options(), lit("raise"))
                     .dt()
                     .date()
-                    .eq(lit(date).str().to_date(StrptimeOptions {
-                        format: Some(PlSmallStr::from_str("%Y-%m-%d")),
-                        ..Default::default()
-                    })),
+                    .eq(lit(date).str().to_date(date_conversion_options())),
             )
             .count()
             .alias("Jobs terminés"),

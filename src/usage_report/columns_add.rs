@@ -20,7 +20,7 @@ use duckdb::Connection;
 use polars::prelude::*;
 use same_file::is_same_file;
 
-use crate::UsageReportError;
+use crate::{UsageReportError, date_conversion_options, datetime_conversion_options};
 
 /// Adds JobRoot and JobInfoType columns based on JobID.
 ///
@@ -173,23 +173,15 @@ pub fn add_units_kmg(mut lf: LazyFrame, colname: &str) -> LazyFrame {
 /// # Returns
 /// A new LazyFrame with the added wait time columns
 pub fn add_wait_time_cols(mut lf: LazyFrame) -> LazyFrame {
-    let datetime_format = "%Y-%m-%dT%H:%M:%S";
-
-    let datetime_conversion_options: StrptimeOptions = StrptimeOptions {
-        format: Some(datetime_format.into()),
-        cache: true,
-        ..Default::default()
-    };
-
     lf = lf.with_columns([(col("Start").str().to_datetime(
         None,
         None,
-        datetime_conversion_options.clone(),
+        datetime_conversion_options(),
         lit("raise"),
     ) - col("Submit").str().to_datetime(
         None,
         None,
-        datetime_conversion_options.clone(),
+        datetime_conversion_options(),
         lit("raise"),
     ))
     .alias("wait_duration")]);
@@ -214,23 +206,15 @@ pub fn add_wait_time_cols(mut lf: LazyFrame) -> LazyFrame {
 /// # Returns
 /// A new LazyFrame with the added duration column
 pub fn add_job_duration_cols(mut lf: LazyFrame) -> LazyFrame {
-    let datetime_format = "%Y-%m-%dT%H:%M:%S";
-
-    let datetime_conversion_options: StrptimeOptions = StrptimeOptions {
-        format: Some(datetime_format.into()),
-        cache: true,
-        ..Default::default()
-    };
-
     lf = lf.with_columns([(col("End").str().to_datetime(
         None,
         None,
-        datetime_conversion_options.clone(),
+        datetime_conversion_options(),
         lit("raise"),
     ) - col("Start").str().to_datetime(
         None,
         None,
-        datetime_conversion_options.clone(),
+        datetime_conversion_options(),
         lit("raise"),
     ))
     .dt()
@@ -265,56 +249,30 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
     let day_start = format!("{}T00:00:00", date_str);
     let day_end = format!("{}T23:59:59", date_str);
 
-    // Convert Start and End to datetime
-    let datetime_format = "%Y-%m-%dT%H:%M:%S";
-    let datetime_conversion_options: StrptimeOptions = StrptimeOptions {
-        format: Some(datetime_format.into()),
-        strict: false,
-        exact: false,
-        cache: true,
-    };
-
-    let start_dt = col("Start").str().to_datetime(
-        Default::default(),
-        Default::default(),
-        datetime_conversion_options.clone(),
-        lit("raise"),
-    );
-    let end_dt = col("End").str().to_datetime(
-        Default::default(),
-        Default::default(),
-        datetime_conversion_options.clone(),
-        lit("raise"),
-    );
+    let start_dt =
+        col("Start")
+            .str()
+            .to_datetime(None, None, datetime_conversion_options(), lit("raise"));
+    let end_dt =
+        col("End")
+            .str()
+            .to_datetime(None, None, datetime_conversion_options(), lit("raise"));
 
     // Create literals for day boundaries
     let day_start_lit = lit(day_start.clone())
         .alias("day_start_lit")
         .str()
-        .to_datetime(
-            Default::default(),
-            Default::default(),
-            datetime_conversion_options.clone(),
-            lit("raise"),
-        )
+        .to_datetime(None, None, datetime_conversion_options(), lit("raise"))
         .alias("day_start");
     let day_end_lit = lit(day_end.clone())
         .alias("day_end_lit")
         .str()
-        .to_datetime(
-            Default::default(),
-            Default::default(),
-            datetime_conversion_options.clone(),
-            lit("raise"),
-        )
+        .to_datetime(None, None, datetime_conversion_options(), lit("raise"))
         .alias("day_end");
 
     // Build the conditional expression for daily duration
     // Convert target_date to a string for consistent comparison
-    let target_date_col = lit(date_str).str().to_date(StrptimeOptions {
-        format: Some("%Y-%m-%d".into()),
-        ..Default::default()
-    });
+    let target_date_col = lit(date_str).str().to_date(date_conversion_options());
 
     // Case 1: Job started and ended on the same day (target day)
     let same_day = start_dt
@@ -362,10 +320,7 @@ pub fn add_daily_duration<S: AsRef<str>>(lf: LazyFrame, date: S) -> LazyFrame {
     // Add date column
     let date_col = lit(date_str.to_string())
         .str()
-        .to_date(StrptimeOptions {
-            format: Some("%Y-%m-%d".into()),
-            ..Default::default()
-        })
+        .to_date(date_conversion_options())
         .alias("date");
 
     lf.with_columns([daily_duration, date_col])
