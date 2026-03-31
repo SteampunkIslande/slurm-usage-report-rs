@@ -48,8 +48,10 @@ pub fn compute_daily_metrics(
             / lit(*cluster_capacity.get("cpu_secondes").unwrap_or(&1) as f64))
             * lit(100.0))
         .alias("Pourcentage d'utilisation CPU"),
-        (((col("MaxRSS") / lit(2i64.pow(30)) * col("ElapsedRaw").cast(DataType::Float64)).sum())
-            .alias("GB.Secondes")),
+        ((col("MaxRSS").cast(DataType::Float64) / lit(2f64.powi(30))
+            * col("ElapsedRaw").cast(DataType::Float64))
+        .sum())
+        .alias("GB.Secondes"),
         (((col("MaxRSS") / lit(2i64.pow(30)) * col("ElapsedRaw").cast(DataType::Float64)).sum()
             / lit(*cluster_capacity.get("gb_secondes").unwrap_or(&1) as f64))
             * lit(100.0))
