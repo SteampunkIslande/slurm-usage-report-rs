@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use clap::Parser;
 use slurm_usage_report_rs::UsageReportError;
-use std::path::PathBuf;
+use std::{io::ErrorKind, path::PathBuf};
 
 use crate::cli::Cli;
 
@@ -38,6 +38,19 @@ pub struct DailyEfficiency {
 impl DailyEfficiency {
     pub fn run(&self, _cli: &Cli) -> Result<(), UsageReportError> {
         use slurm_usage_report_rs::daily_efficiency::generate_daily_report;
+
+        if !self.database.exists() {
+            return Err(UsageReportError::IOError(std::io::Error::new(
+                ErrorKind::NotFound,
+                format!("{} does not exist!", self.database.display()),
+            )));
+        }
+        if !self.database.is_dir() {
+            return Err(UsageReportError::IOError(std::io::Error::new(
+                ErrorKind::NotADirectory,
+                format!("{} is not a directory!", self.database.display()),
+            )));
+        }
 
         generate_daily_report(
             self.date.format("%Y-%m-%d").to_string().as_str(),

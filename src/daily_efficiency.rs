@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::{collections::HashMap, str::FromStr};
 
 use chrono::Local;
 use polars::prelude::*;
@@ -11,28 +11,11 @@ use crate::{
     date_conversion_options, datetime_conversion_options, generic_report,
 };
 
-fn anyvalue_to_f64(v: &AnyValue) -> f64 {
-    match v {
-        AnyValue::Null => 0.0,
-        AnyValue::Int8(n) => *n as f64,
-        AnyValue::Int16(n) => *n as f64,
-        AnyValue::Int32(n) => *n as f64,
-        AnyValue::Int64(n) => *n as f64,
-        AnyValue::UInt8(n) => *n as f64,
-        AnyValue::UInt16(n) => *n as f64,
-        AnyValue::UInt32(n) => *n as f64,
-        AnyValue::UInt64(n) => *n as f64,
-        AnyValue::Float32(n) => *n as f64,
-        AnyValue::Float64(n) => *n,
-        _ => 0.0,
-    }
-}
-
 fn dataframe_row_to_map(
     df: &DataFrame,
     row_idx: usize,
     exclude: &str,
-) -> serde_json::Map<String, Value> {
+) -> Result<serde_json::Map<String, Value>, UsageReportError> {
     let mut map = serde_json::Map::new();
     for col_name in df.get_column_names() {
         if col_name == exclude {
@@ -40,9 +23,9 @@ fn dataframe_row_to_map(
         }
         let col = df.column(col_name).unwrap();
         let val = col.get(row_idx).unwrap();
-        map.insert(col_name.to_string(), json!(anyvalue_to_f64(&val)));
+        map.insert(col_name.to_string(), Value::from_str(&val.to_string())?);
     }
-    map
+    Ok(map)
 }
 
 pub fn compute_daily_metrics(
@@ -200,13 +183,16 @@ pub fn compute_daily_metrics(
             .get(row_idx)
             .unwrap_or_default()
             .to_string();
-        let row_map = dataframe_row_to_map(&qos_df, row_idx, "QOS");
+        let row_map = dataframe_row_to_map(&qos_df, row_idx, "QOS")?;
         result.insert(qos_name, Value::Object(row_map));
     }
 
     let mut global_map = serde_json::Map::new();
+    if global_df.height() != 1 {
+        eprintln!("Something is wrong");
+    }
     for row_idx in 0..global_df.height() {
-        global_map = dataframe_row_to_map(&global_df, row_idx, "date");
+        global_map = dataframe_row_to_map(&global_df, row_idx, "date")?;
     }
     result.insert("global".to_string(), Value::Object(global_map));
 

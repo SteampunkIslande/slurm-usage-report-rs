@@ -17,6 +17,7 @@ polars = { version = "0.53.0", features = [
     "strings",
     "regex",
     "csv",
+    "serde",
 ] }
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
