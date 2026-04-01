@@ -58,17 +58,6 @@ fn checks(command: &PostRunCmd, _cli: &Cli) -> Result<(), UsageReportError> {
             )));
         }
     }
-    if let Some(outdir) = &command.output_dir
-        && outdir.exists()
-        && !command.force
-    {
-        return Err(UsageReportError::IOError(std::io::Error::new(
-            ErrorKind::AlreadyExists,
-            format!(
-                "Le dossier de sortie existe déjà. Pour forcer l'écriture dans ce dossier, utilisez l'option -f/--force"
-            ),
-        )));
-    }
     Ok(())
 }
 
@@ -80,10 +69,21 @@ impl PostRunCmd {
         let output_dir: PathBuf = self
             .output_dir
             .clone()
-            .unwrap_or(std::env::current_dir()?.join("usage-report"));
+            .or_else(|| Some(std::env::current_dir().ok()?.join("usage-report"))) // Returns none if cannot get current_dir
+            .and_then(|o| Some(o.canonicalize().ok()?)) //Returns none if cannot canonicalize
+            .ok_or(UsageReportError::ImpossibleOutputDir)?;
 
-        if output_dir.exists() && self.force {
-            std::fs::remove_dir_all(&output_dir)?;
+        if output_dir.exists() {
+            if self.force {
+                std::fs::remove_dir_all(&output_dir)?;
+            } else {
+                return Err(UsageReportError::IOError(std::io::Error::new(
+                    ErrorKind::AlreadyExists,
+                    format!(
+                        "Le dossier de sortie existe déjà. Pour forcer l'écriture dans ce dossier, utilisez l'option -f/--force"
+                    ),
+                )));
+            }
         }
         std::fs::create_dir_all(&output_dir)?;
 

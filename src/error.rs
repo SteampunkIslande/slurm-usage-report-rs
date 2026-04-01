@@ -31,4 +31,6 @@ pub enum UsageReportError {
     SameFile(String, String),
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
+    #[error("Cannot determine output dir!")]
+    ImpossibleOutputDir,
 }
