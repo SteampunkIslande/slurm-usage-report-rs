@@ -66,12 +66,28 @@ impl PostRunCmd {
         // Run checks before even thinking about running this CLI entry point.
         checks(self, cli)?;
 
-        let output_dir: PathBuf = self
-            .output_dir
-            .clone()
-            .or_else(|| Some(std::env::current_dir().ok()?.join("usage-report"))) // Returns none if cannot get current_dir
-            .and_then(|o| Some(o.canonicalize().ok()?)) //Returns none if cannot canonicalize
-            .ok_or(UsageReportError::ImpossibleOutputDir)?;
+        let output_dir = {
+            let output_dir = if let Some(dir) = self.output_dir.clone() {
+                dir
+            } else {
+                std::env::current_dir()
+                    .map_err(|_| UsageReportError::ImpossibleOutputDir)?
+                    .join("usage-report")
+            };
+
+            // Si le chemin est relatif → le rendre absolu
+            let output_dir = if output_dir.is_relative() {
+                std::env::current_dir()
+                    .map_err(|_| UsageReportError::ImpossibleOutputDir)?
+                    .join(output_dir)
+            } else {
+                output_dir
+            };
+            output_dir
+        };
+
+        // Créer le dossier s’il n’existe pas
+        std::fs::create_dir_all(&output_dir).map_err(|_| UsageReportError::ImpossibleOutputDir)?;
 
         if output_dir.exists() {
             if self.force {
