@@ -44,10 +44,20 @@ pub fn aggregate_per_alloc(
         .iter_names_and_dtypes()
         .filter_map(|(name, dtype)| {
             if name.as_str() != group_col {
-                if dtype.is_numeric() {
-                    Some(col(name.clone()).max())
-                } else {
-                    Some(col(name.clone()).drop_nulls().first())
+                //Special columns
+                match name.as_str() {
+                    "JobName" => Some(
+                        col(name.clone())
+                            .filter(col(name.clone()).str().len_chars().eq(lit(36)))
+                            .first(),
+                    ),
+                    _ => {
+                        if dtype.is_numeric() {
+                            Some(col(name.clone()).max())
+                        } else {
+                            Some(col(name.clone()).drop_nulls().first())
+                        }
+                    }
                 }
             } else {
                 None
