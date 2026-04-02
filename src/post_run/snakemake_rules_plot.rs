@@ -50,13 +50,7 @@ where
         .column("rule_name")?
         .unique()?
         .sort(SortOptions::new().with_order_reversed())?
-        .as_series()
-        .ok_or(UsageReportError::NoneValueError {
-            message: "Could not get a series for rule_name column".to_string(),
-            file: file!().into(),
-            line: line!(),
-            column: column!(),
-        })?
+        .as_materialized_series()
         .str()?
         .into_iter()
         .filter_map(|e| e.map(|e| e.to_string()))
@@ -95,13 +89,7 @@ where
             BoxPlot::new_xy(
                 rule_data[column.as_ref()]
                     .cast(&DataType::Float32)?
-                    .as_series()
-                    .ok_or(UsageReportError::NoneValueError {
-                        message: "Could not get a series for rule_name column".to_string(),
-                        file: file!().into(),
-                        line: line!(),
-                        column: column!(),
-                    })?
+                    .as_materialized_series()
                     .f32()?
                     .into_iter()
                     .collect(),

@@ -538,13 +538,7 @@ pub fn df_to_columnar_json(df: &DataFrame) -> Result<Value, UsageReportError> {
         let name = col.name().to_string();
 
         let values: Vec<Value> = col
-            .as_series()
-            .ok_or(UsageReportError::NoneValueError {
-                message: "Cannot get series".into(),
-                file: file!().to_string(),
-                line: line!(),
-                column: column!(),
-            })?
+            .as_materialized_series()
             .iter()
             .map(anyvalue_to_json)
             .collect();
