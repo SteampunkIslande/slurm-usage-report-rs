@@ -85,10 +85,6 @@ impl PostRunCmd {
             };
             output_dir
         };
-
-        // Créer le dossier s’il n’existe pas
-        std::fs::create_dir_all(&output_dir).map_err(|_| UsageReportError::ImpossibleOutputDir)?;
-
         if output_dir.exists() {
             if self.force {
                 std::fs::remove_dir_all(&output_dir)?;
