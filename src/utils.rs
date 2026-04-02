@@ -295,7 +295,7 @@ where
     let mut writer = inp.writer();
     for line in reader.lines() {
         let line = line?;
-        if line.split(separator.unwrap_or("|")).count() != (col_count.unwrap_or(109) - 1) as usize {
+        if line.split(separator.unwrap_or("|")).count() != col_count.unwrap_or(109) as usize {
             removed_lines += 1;
         } else {
             writeln!(writer, "{line}")?;
