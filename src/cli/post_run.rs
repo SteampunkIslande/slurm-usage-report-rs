@@ -104,6 +104,7 @@ impl PostRunCmd {
 
         // List of slurm names to gather metrics for
         let slurm_job_names = snakemake_parse_log::get_slurm_ids(&self.input)?;
+        eprintln!("Found jobs: {:?}", slurm_job_names);
 
         // Could be confusing, but if no_input_size_relative_metrics is true, this means the user wants them (it's a negative flag)
         let input_sizes_path = if self.no_input_size_relative_metrics {
