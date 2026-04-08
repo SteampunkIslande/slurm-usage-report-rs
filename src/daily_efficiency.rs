@@ -3,6 +3,7 @@ use std::path::Path;
 use std::{collections::HashMap, str::FromStr};
 
 use base64::Engine;
+use charming::datatype::{DataPoint, DataPointItem};
 use chrono::{Local, NaiveDate, Utc};
 use plotly::{Layout, Scatter};
 use polars::prelude::*;
@@ -288,6 +289,7 @@ const METRICS_CONFIG: [(&'static str, &'static str); 2] = [
 ];
 
 fn generate_calendar_heatmap(dates: &[String], values: &[f64]) -> Result<String, UsageReportError> {
+    let vals = Vec::new();
     let chart = Chart::new()
         .visual_map(VisualMap::new().show(false).min(0).max(10000))
         .calendar(Calendar::new().range((
@@ -297,15 +299,12 @@ fn generate_calendar_heatmap(dates: &[String], values: &[f64]) -> Result<String,
         .series(
             Heatmap::new()
                 .coordinate_system(CoordinateSystem::Calendar)
-                .data(
-                    dates
-                        .iter()
-                        .zip(values)
-                        .fold(Vec::new(), |mut v, (date, val)| {
-                            v.push(vec![date.to_string().into(), (*val).into()]);
-                            v
-                        }),
-                ),
+                .data(dates.iter().zip(values).fold(vals, |mut v, (date, val)| {
+                    v.push(vec![DataPoint::Item(
+                        DataPointItem::new(*val).name(date.to_string()),
+                    )]);
+                    v
+                })),
         );
 
     let mut renderer = ImageRenderer::new(1000, 800);
@@ -370,9 +369,6 @@ fn load_reports_data(
                     dates.push(date_str);
                     reports_data.push(Map::new());
                 }
-            } else {
-                dates.push(date_str);
-                reports_data.push(Map::new());
             }
         }
 

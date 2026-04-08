@@ -88,14 +88,8 @@ render_chart_filter_script, render_chart_selector_styles %}
     {"id": "line", "label": "Courbe"}
     ] %}
 
-    {# Extraire les métriques uniques depuis les calendriers #}
-    {% set metrics = [] %}
-    {% for metric in calendars %}
-    {% set _ = metrics.append({"id": metric.title, "label": metric.title}) %}
-    {% endfor %}
-
     {# Afficher le sélecteur de graphiques #}
-    {{ render_chart_selector(chart_types, metrics) }}
+    {{ render_chart_selector(chart_types, calendars) }}
 
     {# Afficher tous les calendriers #}
     {% for metric in calendars %}

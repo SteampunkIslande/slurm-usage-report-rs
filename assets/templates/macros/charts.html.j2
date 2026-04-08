@@ -45,7 +45,7 @@ Macro pour afficher un sélecteur de type de graphique et de métrique
 
 Args:
 chart_types: liste de tuples (id, label) pour les types de graphiques
-metrics: liste de tuples (id, label) pour les métriques disponibles
+metrics: liste d'objets avec une propriété title (ou directement une liste de titles)
 #}
 {% macro render_chart_selector(chart_types, metrics) %}
 <div class="chart-selector">
@@ -63,7 +63,11 @@ metrics: liste de tuples (id, label) pour les métriques disponibles
         <select id="metric-select" onchange="updateChartVisibility()">
             <option value="all">Toutes</option>
             {% for metric in metrics %}
-            <option value="{{ metric.id }}">{{ metric.label }}</option>
+            {% if metric.title is defined %}
+            <option value="{{ metric.title }}">{{ metric.title }}</option>
+            {% else %}
+            <option value="{{ metric }}">{{ metric }}</option>
+            {% endif %}
             {% endfor %}
         </select>
     </div>
