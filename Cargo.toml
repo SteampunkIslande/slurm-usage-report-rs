@@ -11,6 +11,7 @@ duckdb = { version = "1.10500.0", features = ["parquet"] }
 include_dir = "0.7.4"
 minijinja = { version = "2.18.0", features = ["preserve_order"] }
 plotly = "0.14.1"
+charming = { version = "0.6", features = ["ssr", "ssr-raster"] }
 polars = { version = "0.53.0", features = [
     "lazy",
     "parquet",
@@ -26,6 +27,7 @@ in-place = "0.2.1"
 chrono = "0.4"
 thiserror = "2.0.18"
 same-file = "1.0.6"
+base64 = "0.22.1"
 
 [dev-dependencies]
 tempfile = "3.15"

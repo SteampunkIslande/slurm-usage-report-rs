@@ -33,4 +33,8 @@ pub enum UsageReportError {
     JsonError(#[from] serde_json::Error),
     #[error("Cannot determine output dir!")]
     ImpossibleOutputDir,
+    #[error(transparent)]
+    NaiveDateError(#[from] chrono::ParseError),
+    #[error(transparent)]
+    CharmingError(#[from] charming::EchartsError),
 }

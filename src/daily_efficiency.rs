@@ -2,9 +2,16 @@ use std::fs;
 use std::path::Path;
 use std::{collections::HashMap, str::FromStr};
 
-use chrono::Local;
+use base64::Engine;
+use chrono::{Local, NaiveDate, Utc};
+use plotly::{Layout, Scatter};
 use polars::prelude::*;
 use serde_json::{Map, Value, json};
+
+use charming::component::{Calendar, VisualMap};
+use charming::element::CoordinateSystem;
+use charming::series::Heatmap;
+use charming::{Chart, ImageRenderer};
 
 use crate::{
     JINJA_ENV, UsageReportError, add_daily_duration, add_job_duration_cols, add_wait_time_cols,
@@ -267,4 +274,173 @@ pub fn generate_daily_html_report(
     }))?;
 
     Ok(html)
+}
+
+const METRICS_CONFIG: [(&'static str, &'static str); 2] = [
+    (
+        "Taux d'occupation de la RAM",
+        "Taux d'occupation de la RAM (% de la capacité totale en GB.secondes)",
+    ),
+    (
+        "Pourcentage d'utilisation CPU",
+        "Taux d'utilisation des CPUs (% de la capacité totale en CPU.secondes)",
+    ),
+];
+
+fn generate_calendar_heatmap(dates: &[String], values: &[f64]) -> Result<String, UsageReportError> {
+    let chart = Chart::new()
+        .visual_map(VisualMap::new().show(false).min(0).max(10000))
+        .calendar(Calendar::new().range((
+            dates.first().unwrap().as_str(),
+            dates.last().unwrap().as_str(),
+        )))
+        .series(
+            Heatmap::new()
+                .coordinate_system(CoordinateSystem::Calendar)
+                .data(
+                    dates
+                        .iter()
+                        .zip(values)
+                        .fold(Vec::new(), |mut v, (date, val)| {
+                            v.push(vec![date.to_string().into(), (*val).into()]);
+                            v
+                        }),
+                ),
+        );
+
+    let mut renderer = ImageRenderer::new(1000, 800);
+    let buffer = renderer.render_format(charming::ImageFormat::Png, &chart)?;
+
+    let base64_str = base64::engine::general_purpose::STANDARD.encode(&buffer);
+    Ok(format!(
+        "<img src=\"data:image/png;base64,{}\" />",
+        base64_str
+    ))
+}
+
+fn generate_line_plot(
+    dates: &[String],
+    values: &[f64],
+    title: &str,
+) -> Result<String, UsageReportError> {
+    if dates.is_empty() || values.is_empty() {
+        return Ok(String::new());
+    }
+
+    let trace = Scatter::new(dates.to_vec(), values.to_vec())
+        .mode(plotly::common::Mode::Lines)
+        .name("");
+
+    let layout = Layout::new()
+        .title(plotly::common::Title::from(""))
+        .x_axis(plotly::layout::Axis::new().title(""))
+        .y_axis(plotly::layout::Axis::new().title(title));
+
+    let mut plot = plotly::Plot::new();
+    plot.add_trace(trace);
+    plot.set_layout(layout);
+
+    Ok(plot.to_html())
+}
+
+fn load_reports_data(
+    database: &Path,
+    from_date: &str,
+    to_date: &str,
+) -> Result<(Vec<String>, Vec<Map<String, Value>>), UsageReportError> {
+    let start = NaiveDate::parse_from_str(from_date, "%Y-%m-%d")?;
+    let end = NaiveDate::parse_from_str(to_date, "%Y-%m-%d")?;
+
+    let mut dates = Vec::new();
+    let mut reports_data = Vec::new();
+    let mut current = start;
+
+    while current <= end {
+        let date_str = current.format("%Y-%m-%d").to_string();
+        let json_file = database.join(format!("{}.json", date_str));
+
+        if json_file.is_file() {
+            let content = std::fs::read_to_string(&json_file)?;
+            let data: Value = serde_json::from_str(&content)?;
+            if let Some(global) = data.get("global") {
+                if let Some(obj) = global.as_object() {
+                    dates.push(date_str);
+                    reports_data.push(obj.clone());
+                } else {
+                    dates.push(date_str);
+                    reports_data.push(Map::new());
+                }
+            } else {
+                dates.push(date_str);
+                reports_data.push(Map::new());
+            }
+        }
+
+        current = current.succ_opt().unwrap_or(end);
+    }
+
+    if reports_data.is_empty() {
+        return Err(UsageReportError::EmptyList {
+            listname: "reports_data".to_string(),
+            message: "Aucune donnée trouvée pour la période demandée.".to_string(),
+        });
+    }
+
+    Ok((dates, reports_data))
+}
+
+pub fn generate_aggregate_report(
+    from_date: &str,
+    to_date: &str,
+    database: &Path,
+    output: &Path,
+) -> Result<(), UsageReportError> {
+    let (dates, reports_data) = load_reports_data(database, from_date, to_date)?;
+
+    let mut calendars = Vec::new();
+    let mut line_plots = Vec::new();
+
+    for (metric_key, metric_title) in METRICS_CONFIG {
+        let values: Vec<f64> = reports_data
+            .iter()
+            .map(|r| r.get(metric_key).and_then(|v| v.as_f64()).unwrap_or(0.0))
+            .collect();
+
+        let min_value = values.iter().cloned().fold(0.0f64, f64::min);
+        let max_value = values.iter().cloned().fold(0.0f64, f64::max);
+
+        let calendar_html = generate_calendar_heatmap(&dates, &values)?;
+
+        calendars.push(serde_json::json!({
+            "title": metric_title,
+            "calendar_html": calendar_html,
+            "min_value": min_value,
+            "max_value": max_value,
+        }));
+
+        let line_html = generate_line_plot(&dates, &values, metric_title)?;
+
+        line_plots.push(serde_json::json!({
+            "title": metric_title,
+            "html": line_html,
+        }));
+    }
+
+    let num_days = reports_data.iter().filter(|r| !r.is_empty()).count();
+
+    let template = JINJA_ENV.get_template("aggregated_efficiency.html.j2")?;
+    let html = template.render(serde_json::json!({
+        "from_date": from_date,
+        "to_date": to_date,
+        "num_days": num_days,
+        "calendars": calendars,
+        "line_plots": line_plots,
+        "generation_time": Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+    }))?;
+
+    std::fs::write(output, &html)?;
+
+    eprintln!("Rapport agrégé généré dans {}", output.display());
+
+    Ok(())
 }

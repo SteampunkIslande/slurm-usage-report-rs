@@ -18,6 +18,9 @@ fn main() -> Result<(), UsageReportError> {
         Commands::DailyEfficiency(daily_efficiency) => {
             daily_efficiency.run(&cli)?;
         }
+        Commands::UsageAggregate(usage_aggregate) => {
+            usage_aggregate.run(&cli)?;
+        }
     }
     Ok(())
 }

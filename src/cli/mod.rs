@@ -10,6 +10,9 @@ use csv_to_parquet::*;
 mod daily_efficiency_report;
 use daily_efficiency_report::*;
 
+mod aggregate_report;
+use aggregate_report::*;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Subcommand)]
@@ -18,6 +21,7 @@ pub enum Commands {
     Autocomplete(AutoComplete),
     CsvToParquet(CsvToParquet),
     DailyEfficiency(DailyEfficiency),
+    UsageAggregate(UsageAggregate),
 }
 
 #[derive(Debug, Parser)]
