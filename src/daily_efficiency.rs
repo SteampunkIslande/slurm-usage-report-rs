@@ -3,11 +3,11 @@ use std::path::Path;
 use std::{collections::HashMap, str::FromStr};
 
 use base64::Engine;
-use charming::datatype::{DataPoint, DataPointItem};
+use charming::datatype::DataPoint;
 use chrono::{Local, NaiveDate, Utc};
 use plotly::{Layout, Scatter};
 use polars::prelude::*;
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
 use charming::component::{Calendar, VisualMap};
 use charming::element::CoordinateSystem;
@@ -15,8 +15,8 @@ use charming::series::Heatmap;
 use charming::{Chart, ImageRenderer};
 
 use crate::{
-    JINJA_ENV, UsageReportError, add_daily_duration, add_job_duration_cols, add_wait_time_cols,
-    date_conversion_options, datetime_conversion_options, generic_report,
+    add_daily_duration, add_job_duration_cols, add_wait_time_cols, date_conversion_options,
+    datetime_conversion_options, generic_report, UsageReportError, JINJA_ENV,
 };
 
 fn dataframe_row_to_map(
@@ -288,10 +288,20 @@ const METRICS_CONFIG: [(&'static str, &'static str); 2] = [
     ),
 ];
 
-fn generate_calendar_heatmap(dates: &[String], values: &[f64]) -> Result<String, UsageReportError> {
-    let vals = Vec::new();
+fn generate_calendar_heatmap(
+    dates: &[String],
+    values: &[f64],
+    min_value: f64,
+    max_value: f64,
+) -> Result<String, UsageReportError> {
+    let data: Vec<Vec<DataPoint>> = dates
+        .iter()
+        .zip(values)
+        .map(|(date, val)| vec![date.clone().into(), (*val).into()])
+        .collect();
+
     let chart = Chart::new()
-        .visual_map(VisualMap::new().show(false).min(0).max(10000))
+        .visual_map(VisualMap::new().show(false).min(min_value).max(max_value))
         .calendar(Calendar::new().range((
             dates.first().unwrap().as_str(),
             dates.last().unwrap().as_str(),
@@ -299,12 +309,7 @@ fn generate_calendar_heatmap(dates: &[String], values: &[f64]) -> Result<String,
         .series(
             Heatmap::new()
                 .coordinate_system(CoordinateSystem::Calendar)
-                .data(dates.iter().zip(values).fold(vals, |mut v, (date, val)| {
-                    v.push(vec![DataPoint::Item(
-                        DataPointItem::new(*val).name(date.to_string()),
-                    )]);
-                    v
-                })),
+                .data(data),
         );
 
     let mut renderer = ImageRenderer::new(1000, 800);
@@ -339,7 +344,7 @@ fn generate_line_plot(
     plot.add_trace(trace);
     plot.set_layout(layout);
 
-    Ok(plot.to_html())
+    Ok(plot.to_inline_html(None))
 }
 
 fn load_reports_data(
@@ -402,10 +407,10 @@ pub fn generate_aggregate_report(
             .map(|r| r.get(metric_key).and_then(|v| v.as_f64()).unwrap_or(0.0))
             .collect();
 
-        let min_value = values.iter().cloned().fold(0.0f64, f64::min);
-        let max_value = values.iter().cloned().fold(0.0f64, f64::max);
+        let min_value = values.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_value = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
-        let calendar_html = generate_calendar_heatmap(&dates, &values)?;
+        let calendar_html = generate_calendar_heatmap(&dates, &values, min_value, max_value)?;
 
         calendars.push(serde_json::json!({
             "title": metric_title,
@@ -424,6 +429,8 @@ pub fn generate_aggregate_report(
 
     let num_days = reports_data.iter().filter(|r| !r.is_empty()).count();
 
+    let plotly_js_source = plotly::Plot::online_cdn_js();
+
     let template = JINJA_ENV.get_template("aggregated_efficiency.html.j2")?;
     let html = template.render(serde_json::json!({
         "from_date": from_date,
@@ -431,6 +438,7 @@ pub fn generate_aggregate_report(
         "num_days": num_days,
         "calendars": calendars,
         "line_plots": line_plots,
+        "plotly_js_source": plotly_js_source,
         "generation_time": Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     }))?;
 
