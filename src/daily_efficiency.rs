@@ -7,7 +7,7 @@ use charming::datatype::DataPoint;
 use chrono::{Local, NaiveDate, Utc};
 use plotly::{Layout, Scatter};
 use polars::prelude::*;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use charming::component::{Calendar, VisualMap};
 use charming::element::CoordinateSystem;
@@ -15,8 +15,8 @@ use charming::series::Heatmap;
 use charming::{Chart, ImageRenderer};
 
 use crate::{
-    add_daily_duration, add_job_duration_cols, add_wait_time_cols, date_conversion_options,
-    datetime_conversion_options, generic_report, UsageReportError, JINJA_ENV,
+    JINJA_ENV, UsageReportError, add_daily_duration, add_job_duration_cols, add_wait_time_cols,
+    date_conversion_options, datetime_conversion_options, generic_report,
 };
 
 fn dataframe_row_to_map(
@@ -198,8 +198,8 @@ pub fn compute_daily_metrics(
     }
 
     let mut global_map = serde_json::Map::new();
-    if global_df.height() != 1 {
-        eprintln!("Something is wrong");
+    if global_df.height() > 1 {
+        eprintln!("Something is wrong. Date:{}", date);
     }
     for row_idx in 0..global_df.height() {
         global_map = dataframe_row_to_map(&global_df, row_idx, "date")?;
