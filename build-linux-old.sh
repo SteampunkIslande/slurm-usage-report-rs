@@ -14,7 +14,7 @@ if [[ ! -f $SINGULARITY_IMAGES_PATH/$SIF_NAME ]];then
     
     SING_DEF=$(mktemp)
     
-cat <<EOF
+cat << EOF
 Bootstrap: docker
 From: ubuntu:20.04
 
@@ -51,7 +51,8 @@ From: ubuntu:20.04
 
 %runscript
     exec "\$@"
-EOF > $SING_DEF
+EOF
+    > $SING_DEF
     
     singularity build --fakeroot $SINGULARITY_IMAGES_PATH/$SIF_NAME $SING_DEF
     
