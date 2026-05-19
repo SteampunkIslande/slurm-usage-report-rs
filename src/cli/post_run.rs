@@ -102,6 +102,18 @@ impl PostRunCmd {
         let output_html: PathBuf = output_dir.join("usage-report.html");
         let output_parquet: PathBuf = output_dir.join("usage-report.parquet");
 
+        // Write useful files for the user to help with optimizing snakemake workflow profiles
+        let output_optimizer_source: PathBuf = output_dir.join("optimizer_source.py");
+        let output_optimizer_notebook: PathBuf = output_dir.join("Optimizer.ipynb");
+        std::fs::write(
+            output_optimizer_source,
+            include_bytes!("../../assets/optimizer_source.py"),
+        )?;
+        std::fs::write(
+            output_optimizer_notebook,
+            include_bytes!("../../assets/Optimizer.ipynb"),
+        )?;
+
         // List of slurm names to gather metrics for
         let slurm_job_names = snakemake_parse_log::get_slurm_ids(&self.input)?;
         eprintln!("Found jobs: {:?}", slurm_job_names);
